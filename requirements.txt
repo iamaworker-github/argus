@@ -29,6 +29,11 @@ lxml>=5.1.0
 PyJWT>=2.8.0
 cryptography>=42.0.0
 
+# OSINT Tools
+holehe>=1.0
+sherlock>=0.4.0
+maigret>=0.4.0
+
 # Parameter Discovery
 arjun>=2.2.7
 

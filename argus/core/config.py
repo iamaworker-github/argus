@@ -156,6 +156,9 @@ class Config:
     opencode_api_key: Optional[str] = None
     opencode_api_base: str = "https://api.opencode.ai/v1"
 
+    # BlockRun API (free DeepSeek V4 Flash - no key needed)
+    blockrun_api_base: str = "https://blockrun.ai/api/v1"
+
     # AI Efficiency features
     ai_model_router_enabled: bool = True
     semantic_cache_enabled: bool = True
@@ -213,6 +216,7 @@ class Config:
             "strix_disable_browser",
             "opencode_api_key",
             "opencode_api_base",
+            "blockrun_api_base",
             # LiteLLM multi-provider config
             "litellm_model",
             "litellm_api_base",

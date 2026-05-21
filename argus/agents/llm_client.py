@@ -65,6 +65,7 @@ class LLMProvider(Enum):
     LM_STUDIO = "lm_studio"
     OPENCODE = "opencode"
     DEEPSEEK = "deepseek"
+    BLOCKRUN = "blockrun"
     CUSTOM = "custom"
 
 
@@ -109,6 +110,7 @@ RATES = {
     "opencode/deepseek-v4-flash": {"in": 0.50, "out": 2.00},
     "deepseek/deepseek-v4-flash": {"in": 0.50, "out": 2.00},
     "deepseek-chat": {"in": 0.50, "out": 2.00},
+    "blockrun/nvidia/deepseek-v4-flash": {"in": 0.0, "out": 0.0},
 }
 
 
@@ -183,6 +185,7 @@ class LLMClient:
         "local": LLMProvider.OLLAMA,
         "opencode": LLMProvider.OPENCODE,
         "deepseek": LLMProvider.DEEPSEEK,
+        "blockrun": LLMProvider.BLOCKRUN,
     }
 
     def __init__(self):
@@ -239,6 +242,8 @@ class LLMClient:
     @property
     def api_key(self) -> Optional[str]:
         m = self.model.lower()
+        if "blockrun" in m:
+            return None
         if "opencode" in m or "deepseek" in m:
             val = self.config.get("opencode_api_key")
             if val:
@@ -264,7 +269,11 @@ class LLMClient:
             kwargs["api_key"] = api_key
 
         m = self.model.lower()
-        if "opencode" in m:
+        if "blockrun" in m:
+            api_base = self.config.get("blockrun_api_base")
+            if not api_base:
+                api_base = "https://blockrun.ai/api/v1"
+        elif "opencode" in m:
             api_base = self.config.get("opencode_api_base")
             if not api_base:
                 api_base = "https://api.opencode.ai/v1"
@@ -366,6 +375,8 @@ class LLMClient:
         kwargs = self._get_litellm_kwargs()
         # Normalize opencode/ → openai/ for LiteLLM (OpenCode is OpenAI-compatible)
         litellm_model = model
+        if litellm_model.startswith("blockrun/"):
+            litellm_model = "openai/" + litellm_model[len("blockrun/"):]
         if litellm_model.startswith("opencode/"):
             litellm_model = "openai/" + litellm_model[len("opencode/"):]
         kwargs["model"] = litellm_model
@@ -505,9 +516,11 @@ class LLMClient:
         )
 
         try:
-            import json
-            parsed = json.loads(resp.content)
-            return schema(**parsed)
+            from argus.core.json_utils import extract_json
+            parsed = extract_json(resp.content) or {}
+            if isinstance(parsed, dict):
+                return schema(**parsed)
+            return schema()
         except Exception as e:
             logger.warning(f"Structured output parse failed for {schema.__name__}: {e}")
             logger.debug(f"Raw response: {resp.content[:500]}")

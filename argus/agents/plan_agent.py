@@ -10,6 +10,7 @@ from argus.agents.base_agent import BaseAgent, AgentResult, Finding, AgentStatus
 from argus.agents.llm_client import LLMClient
 from argus.skills.registry import SkillRegistry, get_skill_registry
 from argus.core.logger import get_logger
+from argus.core.json_utils import extract_json_safe
 
 logger = get_logger()
 
@@ -127,8 +128,7 @@ Rules:
 
         try:
             response = await self.llm_client.generate(prompt=prompt, max_tokens=300, temperature=0.3)
-            parsed = json.loads(response.content.strip())
-            cats = parsed.get("categories", ["web", "recon"])
+            parsed = extract_json_safe(response.content.strip(), {})
             cats = [c for c in cats if c in CATEGORY_AGENTS]
             if not cats:
                 cats = ["web", "recon"]

@@ -171,6 +171,15 @@ def __getattr__(name):
     _ensure_graph_memory()
     if name in _graph_memory_classes:
         return _graph_memory_classes[name]
+    _ensure_corpus()
+    if name in _corpus_classes:
+        return _corpus_classes[name]
+    _ensure_embedding()
+    if name in _embedding_classes:
+        return _embedding_classes[name]
+    _ensure_reaction()
+    if name in _reaction_classes:
+        return _reaction_classes[name]
     raise AttributeError(f"module 'argus.core' has no attribute '{name}'")
 
 # ---------------------------------------------------------------------------
@@ -325,6 +334,129 @@ def _ensure_graph_memory():
         except Exception:
             pass
         _graph_memory_loaded = True
+
+# ========================================================================
+# RAG Search (Phase 3 — prior art semantic search)
+# ========================================================================
+
+_rag_loaded = False
+_rag_classes = {}
+
+def _ensure_rag():
+    global _rag_loaded, _rag_classes
+    if not _rag_loaded:
+        try:
+            from argus.core.rag_search import RagSearch, PriorArt, get_rag_search
+            _rag_classes.update({
+                "RagSearch": RagSearch, "PriorArt": PriorArt,
+                "get_rag_search": get_rag_search,
+            })
+        except Exception:
+            pass
+        _rag_loaded = True
+
+# ========================================================================
+# Autopilot (Phase 3 — autonomous hunt loop)
+# ========================================================================
+
+_autopilot_loaded = False
+_autopilot_classes = {}
+
+def _ensure_autopilot():
+    global _autopilot_loaded, _autopilot_classes
+    if not _autopilot_loaded:
+        try:
+            from argus.core.autopilot import Autopilot, HuntSession, EndpointState, get_autopilot
+            _autopilot_classes.update({
+                "Autopilot": Autopilot, "HuntSession": HuntSession,
+                "EndpointState": EndpointState, "get_autopilot": get_autopilot,
+            })
+        except Exception:
+            pass
+        _autopilot_loaded = True
+
+# ========================================================================
+# Corpus Populator (Phase 4 — production RAG data pipeline)
+# ========================================================================
+
+_corpus_loaded = False
+_corpus_classes = {}
+
+def _ensure_corpus():
+    global _corpus_loaded, _corpus_classes
+    if not _corpus_loaded:
+        try:
+            from argus.core.corpus_populator import CorpusPopulator, populate_from_all_sources, get_corpus_stats, refresh_corpus
+            _corpus_classes.update({
+                "CorpusPopulator": CorpusPopulator,
+                "populate_from_all_sources": populate_from_all_sources,
+                "get_corpus_stats": get_corpus_stats,
+                "refresh_corpus": refresh_corpus,
+            })
+        except Exception:
+            pass
+        _corpus_loaded = True
+
+# ========================================================================
+# Reaction Engine (Phase 4 — cross-agent collaboration)
+# ========================================================================
+
+_reaction_loaded = False
+_reaction_classes = {}
+
+def _ensure_reaction():
+    global _reaction_loaded, _reaction_classes
+    if not _reaction_loaded:
+        try:
+            from argus.core.reaction_engine import ReactionEngine, ReactionRule, get_reaction_engine
+            _reaction_classes.update({
+                "ReactionEngine": ReactionEngine,
+                "ReactionRule": ReactionRule,
+                "get_reaction_engine": get_reaction_engine,
+            })
+        except Exception:
+            pass
+        _reaction_loaded = True
+
+# ========================================================================
+# Embeddings (Phase 4 — production embedding engine)
+# ========================================================================
+
+_embedding_loaded = False
+_embedding_classes = {}
+
+def _ensure_embedding():
+    global _embedding_loaded, _embedding_classes
+    if not _embedding_loaded:
+        try:
+            from argus.core.embeddings import EmbeddingEngine, get_embedding_engine, EMBEDDING_DIM
+            _embedding_classes.update({
+                "EmbeddingEngine": EmbeddingEngine,
+                "get_embedding_engine": get_embedding_engine,
+                "EMBEDDING_DIM": EMBEDDING_DIM,
+            })
+        except Exception:
+            pass
+        _embedding_loaded = True
+
+# ========================================================================
+# Safety Rules (Phase 3 — src-hunter style red lines)
+# ========================================================================
+
+_safety_loaded = False
+_safety_classes = {}
+
+def _ensure_safety():
+    global _safety_loaded, _safety_classes
+    if not _safety_loaded:
+        try:
+            from argus.core.safety_rules import SafetyRules, SafetyViolation
+            _safety_classes.update({
+                "SafetyRules": SafetyRules, "SafetyViolation": SafetyViolation,
+            })
+        except Exception:
+            pass
+        _safety_loaded = True
 
 # ========================================================================
 # New modules (Phase 2 improvements)
@@ -563,6 +695,16 @@ def __getattr__(name):
     _ensure_settings()
     if name in _settings_classes:
         return _settings_classes[name]
+    # Phase 3 modules
+    _ensure_rag()
+    if name in _rag_classes:
+        return _rag_classes[name]
+    _ensure_autopilot()
+    if name in _autopilot_classes:
+        return _autopilot_classes[name]
+    _ensure_safety()
+    if name in _safety_classes:
+        return _safety_classes[name]
     raise AttributeError(f"module 'argus.core' has no attribute '{name}'")
 
 # Define __all__ after __getattr__ so static analysis tools work
@@ -622,4 +764,12 @@ __all__ = [
     "ChainExecutor", "ChainExecutionResult", "get_chain_executor",
     "LLMDeduplicator", "FindingRecord", "DedupResult", "get_llm_deduplicator",
     "ArgusSettings",
+    # Phase 3 modules
+    "RagSearch", "PriorArt", "get_rag_search",
+    "Autopilot", "HuntSession", "EndpointState", "get_autopilot",
+    "SafetyRules", "SafetyViolation",
+    # Phase 4 modules
+    "CorpusPopulator", "populate_from_all_sources", "get_corpus_stats", "refresh_corpus",
+    "EmbeddingEngine", "get_embedding_engine", "EMBEDDING_DIM",
+    "ReactionEngine", "ReactionRule", "get_reaction_engine",
 ]

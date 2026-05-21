@@ -1,6 +1,12 @@
 """
-WafDetectionAgent — Detects WAF/firewall using wafw00f + AI analysis.
-AI then decides optimal Nmap/Naabu flags for port scanning.
+WafDetectionAgent — Detects WAF/firewall using wafw00f + AI analysis,
+then auto-deploys WAF bypass engine for intelligent payload selection.
+Integration pipeline:
+  1. Detect WAF (wafw00f + headers + behavior)
+  2. Fingerprint WAF vendor via response headers
+  3. Select bypass techniques from WAFBypassEngine
+  4. Report findings with bypass payloads
+  5. AI selects optimal Nmap/Naabu flags considering WAF type
 """
 import asyncio
 import json
@@ -62,6 +68,7 @@ class WafDetectionAgent(BaseAgent):
         self.nmap_flags: str = NMAP_FLAG_STRATEGIES["no_waf"]["nmap_flags"]
         self.naabu_flags: str = NMAP_FLAG_STRATEGIES["no_waf"]["naabu_flags"]
         self.firewall_detected: bool = False
+        self.bypass_payloads: List[str] = []
 
     async def execute(self) -> AgentResult:
         logger.info(f"{self.name}: Analyzing WAF/firewall for {self.target}")
@@ -72,12 +79,16 @@ class WafDetectionAgent(BaseAgent):
         if not self.detected_wafs:
             await self._detect_firewall_behavior()
 
+        await self._attempt_waf_bypass()
         await self._ai_select_scan_strategy()
 
         if self.detected_wafs:
+            bypass_desc = ""
+            if self.bypass_payloads:
+                bypass_desc = f"\nBypass payloads ready: {len(self.bypass_payloads)} techniques"
             self.add_finding(Finding(
                 title=f"WAF/Firewall Detected: {', '.join(self.detected_wafs)}",
-                description=f"Using scan strategy: {NMAP_FLAG_STRATEGIES.get(self.selected_strategy, {}).get('label', 'standard')}",
+                description=f"Using scan strategy: {NMAP_FLAG_STRATEGIES.get(self.selected_strategy, {}).get('label', 'standard')}{bypass_desc}",
                 severity="medium",
                 category="waf_detection",
                 evidence=f"WAF: {self.detected_wafs}, Strategy: {self.selected_strategy}, Nmap: {self.nmap_flags}",
@@ -97,6 +108,8 @@ class WafDetectionAgent(BaseAgent):
                 "naabu_flags": self.naabu_flags,
                 "nmap_command": f"nmap {self.nmap_flags} {self.target}",
                 "naabu_command": f"naabu {self.naabu_flags} {self.target}",
+                "bypass_payloads": self.bypass_payloads[:10],
+                "bypass_count": len(self.bypass_payloads),
             },
         )
 
@@ -190,6 +203,65 @@ class WafDetectionAgent(BaseAgent):
         except Exception as e:
             logger.debug(f"Behavioral firewall detection failed: {e}")
 
+    async def _attempt_waf_bypass(self) -> None:
+        """Use WAFBypassEngine to select bypass payloads for detected WAF.
+
+        Integrates with the WAF Bypass Engine to get context-aware
+        bypass techniques that downstream agents can use.
+        """
+        if not self.detected_wafs:
+            return
+
+        try:
+            from argus.agents.waf_bypass_engine import get_waf_bypass
+            engine = get_waf_bypass()
+
+            waf_type = self._map_waf_to_vendor(self.detected_wafs[0])
+
+            self.bypass_payloads = engine.get_payloads(waf_type, count=10)
+            if not self.bypass_payloads:
+                self.bypass_payloads = engine.get_payloads("unknown", count=10)
+
+            if self.bypass_payloads:
+                bypass_context = engine.get_bypass_context(waf_type, stealth=True)
+                self.add_finding(Finding(
+                    title=f"WAF Bypass Techniques Ready — {len(self.bypass_payloads)} payloads",
+                    description=f"Detected WAF: {self.detected_wafs[0]} → {waf_type}\n"
+                                f"Using {len(self.bypass_payloads)} bypass payloads for testing",
+                    severity="info",
+                    category="waf_bypass",
+                    evidence=f"Bypass payloads: {self.bypass_payloads[:5]}",
+                    confidence=0.9,
+                ))
+                logger.info(f"{self.name}: {len(self.bypass_payloads)} bypass payloads loaded for {waf_type}")
+        except Exception as e:
+            logger.debug(f"WAF bypass engine failed: {e}")
+
+    @staticmethod
+    def _map_waf_to_vendor(detected_name: str) -> str:
+        """Map detected WAF name to WAFBypassEngine vendor name."""
+        name = detected_name.lower()
+        mapping = {
+            "cloudflare": "cloudflare",
+            "aws": "aws_waf",
+            "amazon": "aws_waf",
+            "modsecurity": "modsecurity",
+            "mod_security": "modsecurity",
+            "f5": "f5_asm",
+            "big-ip": "f5_asm",
+            "bigip": "f5_asm",
+            "akamai": "akamai",
+            "imperva": "imperva",
+            "incapsula": "imperva",
+            "sucuri": "sucuri",
+            "wordfence": "wordfence",
+            "barracuda": "barracuda",
+        }
+        for key, vendor in mapping.items():
+            if key in name:
+                return vendor
+        return "unknown"
+
     async def _ai_select_scan_strategy(self) -> None:
         if not self.detected_wafs and not self.firewall_detected:
             self.selected_strategy = "no_waf"
@@ -226,7 +298,8 @@ Choose the BEST nmap scan strategy from these options:
 
 Return ONLY a JSON: {{"strategy": "key_name", "reason": "why this strategy"}}"""
             resp = await self.llm.generate(prompt=prompt, max_tokens=200, temperature=0.3)
-            parsed = json.loads(resp.content.strip())
+            from argus.core.json_utils import extract_json_safe
+            parsed = extract_json_safe(resp.content.strip(), {})
             ai_strategy = parsed.get("strategy", self.selected_strategy)
             if ai_strategy in NMAP_FLAG_STRATEGIES:
                 self.selected_strategy = ai_strategy

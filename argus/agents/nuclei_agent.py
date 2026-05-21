@@ -96,7 +96,8 @@ Available nuclei templates include: {', '.join(sorted(matched)) if matched else 
 Select 3-5 most relevant nuclei template categories for this target.
 Return ONLY a JSON list: ["template1", "template2", "template3"]"""
             resp = await self.llm.generate(prompt=prompt, max_tokens=200, temperature=0.3)
-            ai_templates = json.loads(resp.content.strip())
+            from argus.core.json_utils import extract_json_safe
+            ai_templates = extract_json_safe(resp.content.strip(), [])
             if isinstance(ai_templates, list) and ai_templates:
                 self.selected_templates = list(dict.fromkeys(self.selected_templates + ai_templates))[:8]
         except Exception:

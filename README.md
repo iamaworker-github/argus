@@ -10,365 +10,195 @@
 ```
 
 > **See Everything. Miss Nothing.**  
-> AI-powered autonomous security testing platform with multi-agent architecture
-> 
-> ✨ **NEW**: Now featuring full **Strix-compatible interface** — use `argus strix -t <target>` with all Strix CLI flags, scan modes (quick/standard/deep), skills system, and AI-driven pentesting!
+> AI-powered autonomous security testing platform — **80+ integrated tools, zero dependency issues**
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Beta-yellow.svg)]()
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker)]()
+[![Tools](https://img.shields.io/badge/Tools-80%2B-00FF88.svg)]()
 
-## 🚀 Overview
+## Quick Install
 
-**Argus** is an AI-powered security testing platform that deploys autonomous agents to identify and validate application vulnerabilities. Named after the all-seeing giant from Greek mythology, Argus uses multiple specialized AI agents working in parallel to discover security flaws with validated proof-of-concepts.
+```bash
+# Docker (recommended — zero dependencies)
+docker pull ghcr.io/iamaworker-github/argus:latest
+docker run --rm -it -v $(pwd):/work ghcr.io/iamaworker-github/argus:latest strix -t https://example.com
 
-### Key Features
+# One-liner installer
+curl -fsSL https://raw.githubusercontent.com/iamaworker-github/argus/main/scripts/install.sh | bash
 
-- 🤖 **Multi-Agent Architecture**: Specialized agents for different attack vectors
-- 🧠 **AI-Powered Analysis**: LLM integration (OpenAI/Anthropic) for intelligent testing
-- 🔧 **Complete Security Toolkit**: HTTP proxy, browser automation, shell executor, Python runtime
-- ⚡ **Parallel Execution**: Run multiple agents concurrently for faster results
-- 🎯 **Validated Findings**: Proof-of-concept generation with Strix-style false positive reduction
-- 🖥️ **Beautiful TUI**: Professional terminal interface with real-time monitoring
-- 🐳 **Docker Support**: Isolated sandbox environment for safe testing
-- 🔄 **Strix-Compatible**: Full Strix CLI interface with scan modes, skills system, and AI-driven planning
-- 📚 **Skills System**: 18+ specialized knowledge packages for deep vulnerability expertise
-- 🎚️ **Scan Depth**: Quick (minutes), Standard (30min-1hr), Deep (1-4hrs) modes
+# Native Python (requires Python 3.11+)
+git clone https://github.com/iamaworker-github/argus.git
+cd argus && bash scripts/install.sh --native
+```
 
-## 🎯 What Argus Does
+## 🚀 Features
 
-Argus automatically detects:
+### Core
+- **Multi-Agent Architecture**: Deploys specialized AI agents for each attack vector in parallel
+- **80+ Integrated Tools**: nmap, nuclei, sqlmap, ffuf, subfinder, httpx, holehe, maigret, sherlock, trufflehog, gitleaks, rustscan, testssl.sh, dnstwist, certipy, responder, prowler, trivy, mobsf, frida, binwalk, volatility, peass, chisel, impacket, kerbrute, and more
+- **Strix-Compatible**: Full Strix CLI interface with scan modes, skills system, AI-driven planning
+- **LLM Integration**: OpenAI, Anthropic, OpenCode (DeepSeek V4), Google AI, Groq, LiteLLM
+- **Zero Dependency Docker**: All tools pre-baked in Docker image, no pip/apt install needed
+- **Dan级 Scanning (Deep+Slow+Accurate)**: White-box source-sink analysis, temporal orchestration, professional reports
 
-- **Injection Flaws**: SQL, NoSQL, Command Injection
-- **Cross-Site Scripting (XSS)**: Reflected, Stored, DOM-based
-- **Server-Side Request Forgery (SSRF)**: Internal network access
-- **Authentication Issues**: Weak credentials, session management
-- **Access Control**: IDOR, privilege escalation
-- **Information Disclosure**: Sensitive endpoints, exposed data
+### Security Testing
+- **Injection Flaws**: SQL, NoSQL, Command Injection, SSTI
+- **XSS**: Reflected, Stored, DOM-based, Blind XSS
+- **SSRF**: Internal network access, cloud metadata, port scanning
+- **Authentication**: Weak credentials, session management, OAuth, 2FA, JWT attacks
+- **Access Control**: IDOR, privilege escalation, mass assignment
+- **Cloud Security**: Prowler (AWS/Azure/GCP), ScoutSuite, Trivy (containers/K8s/IaC)
+- **Active Directory**: Certipy, BloodHound, Kerbrute, Impacket, NetExec, Responder
+- **Mobile Security**: MobSF (APK/IPA analysis), Frida (dynamic instrumentation)
+- **OSINT**: Holehe (email), Maigret (username 3000+ sites), Sherlock, SpiderFoot, theHarvester
+
+### Scanning Modes
+| Mode | Duration | Depth | Use Case |
+|---|---|---|---|
+| `quick` | 5-15 min | Surface scan | CI/CD gate |
+| `standard` | 30-60 min | Standard depth | Bug bounty triage |
+| `deep` | 1-4 hrs | Full coverage | Pentest engagement |
+| `whitebox` | varies | Source-sink analysis | Code review |
+
+## 📦 Docker Usage
+
+```bash
+# Pull and run
+docker pull ghcr.io/iamaworker-github/argus:latest
+
+# Quick web recon
+docker run --rm -it -v $(pwd):/work \
+  ghcr.io/iamaworker-github/argus:latest strix -t https://example.com -m quick
+
+# Deep pentest with Docker socket (for tool_runner)
+docker run --rm -it \
+  -v $(pwd):/work \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  -e LLM_API_KEY="your-key" \
+  ghcr.io/iamaworker-github/argus:latest strix -t https://example.com -m deep
+
+# API mode
+docker run --rm -d -p 8484:8484 \
+  -v /var/run/docker.sock:/var/run/docker.sock:ro \
+  ghcr.io/iamaworker-github/argus:latest api
+
+# Docker compose (with Redis + Neo4j)
+docker compose --profile memory up -d
+```
+
+## 🛠 Tool Registry
+
+Argus v3 has a centralized tool registry with **84 indexed tools**:
+
+```bash
+# List all tools by category
+docker run --rm ghcr.io/iamaworker-github/argus:latest python3 -c "
+from argus.core.tool_runner import ToolRunner
+r = ToolRunner()
+print('Categories:', r.list_categories())
+print('Workflows:', list(r.get_workflows().keys()))
+"
+```
+
+### Built-in Workflows
+
+| Workflow | Chain |
+|---|---|
+| `recon` | subfinder → httpx → nuclei → amass |
+| `web_audit` | httpx → nuclei → ffuf → gobuster → wafw00f → testssl |
+| `osint_email` | holehe → theharvester → infoga |
+| `osint_username` | maigret → sherlock → socialscan |
+| `secret_scan` | trufflehog → gitleaks → gitdork |
+| `ad_assessment` | bloodhound → certipy → kerbrute → impacket → netexec → responder |
+| `cloud_audit` | prowler → scoutsuite → pacu → trivy |
+| `mobile_test` | mobsf → frida → objection → jadx |
+| `forensics` | volatility → binwalk → pspy |
+| `tls_audit` | testssl → nuclei -tags ssl,tls |
+| `port_scan` | masscan → rustscan → nmap |
+| `web_fuzz` | ffuf → gobuster → dirsearch → arjun |
+
+### Docker Image Overrides
+
+All external tools automatically run through purpose-built Docker images when available:
+
+```python
+from argus.core.tool_runner import ToolRunner
+runner = ToolRunner()
+result = await runner.execute("information_gathering.Holehe", args="user@example.com")
+# Auto-detects Docker, pulls megadose/holehe, runs, returns structured JSON
+```
+
+## 🤖 Architecture
+
+```
+User Input → PlanAgent (LLM analyzes target)
+                  ↓
+          Agent Orchestrator
+           /    |    |    \
+    WebAgent  NetworkAgent  OSINTAgent  CloudAgent ...
+      |          |            |            |
+    nuclei     nmap        holehe       prowler
+    sqlmap     rustscan    maigret      trivy
+    ffuf       testssl     sherlock     scoutsuite
+    ...        ...         ...          ...
+
+    All tools execute via ToolRunner → Docker (preferred) / Native
+    Results → Blackboard → Graph Memory → Professional Report
+```
 
 ## 📋 Requirements
 
-- **Python**: 3.8 or higher
-- **Docker**: For sandboxed execution (optional but recommended)
-- **API Keys**: OpenAI or Anthropic (for AI features)
+- **Docker** (recommended) or **Python 3.11+** (native)
+- **API Keys**: OpenAI / Anthropic / OpenCode (for AI features)
 
-## 🚀 Quick Start
+## 🔧 Native Install
 
-### Installation
-
-**One-liner (Linux/macOS):**
-```bash
-curl -fsSL https://raw.githubusercontent.com/iamaworker-github/argus/main/scripts/install.sh | bash
-```
-
-**Or clone manually:**
 ```bash
 git clone https://github.com/iamaworker-github/argus.git
 cd argus
-bash scripts/install.sh --full
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+pip install -e .
+python -m playwright install chromium
 ```
 
-### Claude Code Agents (Optional)
+## 📚 Claude Code Agents
 
-Argus includes **43 specialized AI agents** for Claude Code that turn it into a multi-agent cybersecurity assistant:
+43 specialized AI agents for Claude Code:
 
 ```bash
-# Install agents globally (available in all Claude Code sessions)
 bash scripts/install.sh --global
-
-# Or one-liner:
-curl -fsSL https://raw.githubusercontent.com/iamaworker-github/argus/main/scripts/install.sh | bash -s -- --global
 ```
 
-Agents include: `web-hunter`, `recon-advisor`, `vuln-scanner`, `exploit-guide`, `ssrf-hunter`, `cloud-security`, `ad-attacker`, and 36 more — covering recon, web app, cloud, AD, mobile, social engineering, forensics, and reporting.
-
-### Basic Usage
-
-**Strix-Style CLI (Pentest Mode - Recommended):**
-```bash
-# Basic scan (deep mode, AI-driven)
-argus strix -t https://example.com
-
-# Quick scan for CI/CD
-argus strix -t https://example.com -m quick -n
-
-# Standard scan with custom focus
-argus strix -t https://example.com -m standard --instruction "Focus on auth bypass and IDOR"
-
-# Deep scan with remediation suggestions
-argus strix -t ./my-app --remediation
-
-# With instruction file
-argus strix -t https://api.example.com --instruction-file ./pentest-instructions.md
-```
-
-**Legacy CLI:**
-```bash
-# Basic scan
-argus scan example.com
-
-# Parallel execution
-argus scan example.com --parallel
-
-# Verbose output
-argus scan example.com -v
-
-# Custom output directory
-argus scan example.com -o ./my_results
-```
-
-**TUI Mode (Interactive):**
-```bash
-# Launch Strix-inspired UI (default)
-argus tui example.com
-
-# Or explicitly
-argus tui example.com --strix
-
-# Use legacy professional UI
-argus tui example.com --professional
-```
-
-> 📖 See [STRIX_UI_GUIDE.md](STRIX_UI_GUIDE.md) for complete UI documentation
-
-### Configuration (Strix-Style)
-
-Argus supports Strix-compatible environment variables:
-
-```bash
-# Required for AI features
-export STRIX_LLM="openai/gpt-5.4"
-export LLM_API_KEY="your-api-key"
-
-# Or use legacy argus config
-export OPENAI_API_KEY="sk-..."
-export ANTHROPIC_API_KEY="sk-..."
-
-# Optional features
-export PERPLEXITY_API_KEY="pplx-..."  # Web search for OSINT
-export STRIX_REASONING_EFFORT="high"  # none/minimal/low/medium/high/xhigh
-export LLM_TIMEOUT="300"              # Request timeout in seconds
-```
-
-Config file at `~/.argus/cli-config.json` (auto-loaded):
-
-```json
-{
-  "env": {
-    "STRIX_LLM": "openai/gpt-5.4",
-    "LLM_API_KEY": "sk-..."
-  }
-}
-```
-
-**Docker Mode (Recommended):**
-```bash
-# Build image
-docker build -t argus .
-
-# Run scan
-docker run -it --rm \
-  -e OPENAI_API_KEY=your_key \
-  -v $(pwd)/results:/app/argus_results \
-  argus scan example.com --parallel
-```
-
-## 🏗️ Architecture
-
-### Project Structure
+## 🏗 Project Structure
 
 ```
 argus/
-├── argus/
-│   ├── core/              # Core modules
-│   │   ├── config.py      # Configuration management
-│   │   └── logger.py      # Logging system
-│   ├── agents/            # AI security agents
-│   │   ├── base_agent.py  # Base agent class
-│   │   ├── orchestrator.py # Agent coordination
-│   │   ├── sql_injection_agent.py
-│   │   ├── xss_agent.py
-│   │   ├── ssrf_agent.py
-│   │   └── recon_agent.py
-│   ├── toolkit/           # Security toolkit
-│   │   ├── browser.py     # Browser automation
-│   │   ├── http_proxy.py  # HTTP proxy
-│   │   ├── shell.py       # Shell executor
-│   │   └── python_runtime.py # Python sandbox
-│   ├── ui/                # User interface
-│   │   └── app.py         # Textual TUI
-│   └── cli.py             # CLI entry point
-├── tests/                 # Test suite
-├── docs/                  # Documentation
-├── examples/              # Example scripts
-├── Dockerfile             # Docker configuration
-├── requirements.txt       # Python dependencies
-└── setup.py              # Package setup
+├── agents/              AI-powered security agents
+│   ├── plan_agent.py    Target analysis & agent selection (LLM)
+│   ├── nuclei_agent.py  Template-based vulnerability scanning
+│   ├── exploitation_agent.py  Auto-exploitation engine
+│   ├── osint/           OSINT intelligence agents
+│   └── pentest/         Pentest-specific agents
+├── core/
+│   ├── tool_runner.py   Unified tool execution (Docker/Native)
+│   ├── tool_system.py   Typed tool registry with 26 registered tools
+│   ├── json_utils.py    Robust LLM JSON extraction
+│   └── config.py        Configuration management
+├── data/
+│   └── tools.json       84-tool central index with Docker mappings
+├── toolkit/
+│   ├── browser.py       Playwright automation
+│   ├── tools/           New tool wrappers (osint, ad, cloud, mobile, forensics)
+│   └── shell.py         Sandboxed command execution
+├── skills/              Agent skill knowledge packages
+└── Dockerfile           Production multi-stage build
 ```
 
-### Multi-Agent System
+## 📄 License
 
-Argus uses a **Graph of Agents** architecture:
+Apache 2.0. See [LICENSE](LICENSE).
 
-1. **Recon Agent**: Information gathering, subdomain discovery, technology detection
-2. **SQL Injection Agent**: Tests for SQL injection vulnerabilities
-3. **XSS Agent**: Detects cross-site scripting flaws
-4. **SSRF Agent**: Identifies server-side request forgery
-
-Agents run in parallel and share findings through the orchestrator.
-
-## 🔧 Configuration
-
-### Environment Variables
-
-Create a `.env` file:
-
-```bash
-# AI Provider (choose one or both)
-OPENAI_API_KEY=sk-...
-ANTHROPIC_API_KEY=sk-ant-...
-
-# Default AI Model
-AI_MODEL=gpt-4-turbo-preview
-
-# Scanning Configuration
-MAX_CONCURRENT_AGENTS=5
-REQUEST_TIMEOUT=30
-MAX_RETRIES=3
-
-# Browser Automation
-HEADLESS_BROWSER=true
-BROWSER_TIMEOUT=30000
-
-# Output
-OUTPUT_DIR=./argus_results
-VERBOSE=false
-DEBUG=false
-```
-
-### Programmatic Usage
-
-```python
-from argus.agents.orchestrator import AgentOrchestrator
-from argus.core.config import Config, set_config
-
-# Configure
-config = Config(verbose=True)
-set_config(config)
-
-# Create orchestrator
-orchestrator = AgentOrchestrator("example.com")
-orchestrator.add_default_agents()
-
-# Run scan
-result = await orchestrator.run_parallel()
-
-# Access findings
-for finding in result.all_findings:
-    print(f"{finding.severity}: {finding.title}")
-```
-
-## 📊 Output
-
-Argus generates:
-
-- **JSON Report**: Complete scan results with all findings
-- **Structured Findings**: Severity, category, evidence, PoC, remediation
-- **Real-time Logs**: Detailed execution logs
-
-Example finding:
-
-```json
-{
-  "title": "SQL Injection in GET parameter",
-  "severity": "critical",
-  "category": "injection",
-  "evidence": "Response contains SQL error",
-  "proof_of_concept": "GET http://example.com?id=' OR '1'='1",
-  "remediation": "Use parameterized queries",
-  "confidence": 0.9,
-  "agent_name": "SQL Injection Agent"
-}
-```
-
-## 🐳 Docker Usage
-
-### Build Image
-
-```bash
-docker build -t argus .
-```
-
-### Run Scan
-
-```bash
-docker run -it --rm \
-  -e OPENAI_API_KEY=$OPENAI_API_KEY \
-  -v $(pwd)/results:/app/argus_results \
-  argus scan target.com --parallel
-```
-
-### Docker Compose
-
-```bash
-docker-compose up
-```
-
-## 🛡️ Security & Ethics
-
-**⚠️ IMPORTANT: Only use Argus on systems you own or have explicit permission to test!**
-
-### Authorized Use Cases
-
-- ✅ Bug bounty programs (with authorization)
-- ✅ Penetration testing (with contract)
-- ✅ Security assessments (authorized)
-- ✅ Your own applications
-- ✅ Educational purposes (on test environments)
-
-### Prohibited Use
-
-- ❌ Unauthorized scanning
-- ❌ Malicious intent
-- ❌ Without explicit permission
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
-
-## 📝 License
-
-Apache License 2.0 - See [LICENSE](LICENSE) file for details.
-
-## 🙏 Credits
-
-**Built with:**
-- [Textual](https://github.com/Textualize/textual) - TUI framework
-- [Rich](https://github.com/Textualize/rich) - Terminal formatting
-- [Playwright](https://playwright.dev/) - Browser automation
-- [OpenAI](https://openai.com/) / [Anthropic](https://anthropic.com/) - AI models
-
-**Inspired by:**
-- [Strix](https://github.com/usestrix/strix) - Security testing concepts
-
-## 📞 Support
-
-- **Issues**: [GitHub Issues](https://github.com/iamaworker-github/argus/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/iamaworker-github/argus/discussions)
-
-## ⭐ Star History
-
-If you find Argus useful, please star the repository!
-
----
-
-**Made with ❤️ for the security community**
-
-*Remember: Always obtain proper authorization before testing any systems you don't own.*
+> **For authorized security testing, bug bounty, CTFs, and research only.**

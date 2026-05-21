@@ -70,6 +70,7 @@ class Finding:
     file_path: Optional[str] = None
     line_number: Optional[int] = None
     code_snippet: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert finding to dictionary"""
@@ -94,6 +95,7 @@ class Finding:
             "file_path": self.file_path,
             "line_number": self.line_number,
             "code_snippet": self.code_snippet,
+            "metadata": self.metadata,
         }
 
 
@@ -459,6 +461,50 @@ class BaseAgent(ABC):
 
         if not finding.fix_hint and finding.remediation:
             finding.fix_hint = finding.remediation
+
+        # Stage 5a: Safety rules check (src-hunter style)
+        try:
+            from argus.core.safety_rules import SafetyRules
+            safety = SafetyRules(scope=self.scope)
+            title_text = f"{finding.title} {finding.description} {finding.category}"
+            violations = safety.check_text(title_text, context=finding.title)
+            if violations:
+                for v in violations:
+                    logger.warning(f"Safety: {v.severity} - {v.message}")
+                if safety.blocked:
+                    logger.warning(f"Safety blocked finding: {finding.title}")
+        except Exception as e:
+            logger.debug(f"Safety rules check error: {e}")
+
+        # Stage 5b: RAG prior art injection into metadata
+        try:
+            from argus.core.rag_search import get_rag_search
+            rag = get_rag_search()
+            prior_context = rag.build_context(
+                f"{finding.title} {finding.description}",
+                technique=finding.category,
+                k=3,
+            )
+            if prior_context:
+                finding.metadata["prior_art"] = prior_context
+        except Exception as e:
+            logger.debug(f"RAG search error: {e}")
+
+        # Stage 5c: CBH-style 7-Question Triage Gate
+        try:
+            from argus.core.triage_gate import get_triage_gate
+            gate = get_triage_gate()
+            triage = gate.evaluate(finding)
+            if triage.verdict.value == "KILL":
+                logger.debug(f"Triage KILL: {finding.title} | {triage.summary}")
+            elif triage.verdict.value in ("DOWNGRADE", "CHAIN"):
+                logger.info(f"Triage {triage.verdict.value}: {finding.title} | {triage.summary}")
+            elif triage.verdict.value == "PASS":
+                logger.debug(f"Triage PASS: {finding.title}")
+            finding.metadata = getattr(finding, 'metadata', {}) or {}
+            finding.metadata["triage"] = triage.to_dict()
+        except Exception as e:
+            logger.debug(f"Triage gate error: {e}")
 
         finding.finding_id = f"{self.name}-{len(self.findings) + 1}"
         self.findings.append(finding)

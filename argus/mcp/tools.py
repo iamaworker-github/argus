@@ -113,3 +113,48 @@ async def get_attack_surface(scan_id: str) -> Dict[str, Any]:
         "total_entries": len(entries),
         "entries": [e.to_dict() for e in entries[:50]],
     }
+
+
+# ============================================================================
+# Bug Bounty MCP Tools
+# ============================================================================
+
+async def bounty_search_programs(platform: str, query: str = "") -> List[Dict[str, Any]]:
+    """Search bug bounty programs."""
+    server = get_bounty_server()
+    return await server.search_programs(platform, query)
+
+
+async def bounty_get_program(platform: str, name: str) -> Optional[Dict[str, Any]]:
+    """Get program details."""
+    server = get_bounty_server()
+    return await server.get_program(platform, name)
+
+
+async def bounty_triage_finding(finding_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Triage a finding for bounty submission readiness."""
+    server = get_bounty_server()
+    return await server.triage_finding(finding_dict)
+
+
+async def bounty_find_programs(target: str) -> List[Dict[str, Any]]:
+    """Find programs matching a target."""
+    server = get_bounty_server()
+    return await server.find_matching_programs(target)
+
+
+async def bounty_submit_report(platform: str, report_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Submit a report to a bounty platform."""
+    server = get_bounty_server()
+    report = BountyReport(
+        platform=platform,
+        program=report_data.get("program", ""),
+        title=report_data.get("title", ""),
+        vulnerability=report_data.get("vulnerability", ""),
+        severity=report_data.get("severity", "medium"),
+        description=report_data.get("description", ""),
+        steps_to_reproduce=report_data.get("steps_to_reproduce", []),
+        impact=report_data.get("impact", ""),
+        status=report_data.get("status", "draft"),
+    )
+    return await server.submit_report(platform, report)

@@ -236,6 +236,50 @@ def build_parser() -> argparse.ArgumentParser:
     graph_parser.add_argument("--output", "-o", type=str, default="attack_graph.html",
                               help="Output HTML file path")
 
+    # ====================================================================
+    # Bug bounty commands
+    # ====================================================================
+    bounty_parser = subparsers.add_parser("bounty", help="Bug bounty platform integration")
+    bounty_sub = bounty_parser.add_subparsers(dest="bounty_command")
+    bp_search = bounty_sub.add_parser("search", help="Search programs")
+    bp_search.add_argument("platform", choices=["hackerone", "bugcrowd", "intigriti"], help="Platform")
+    bp_search.add_argument("--query", "-q", type=str, default="", help="Search query")
+    bp_triage = bounty_sub.add_parser("triage", help="Triage a finding for bounty")
+    bp_triage.add_argument("--finding-file", type=str, required=True, help="Finding JSON file")
+    bp_submit = bounty_sub.add_parser("submit", help="Submit report (saves locally)")
+    bp_submit.add_argument("platform", choices=["hackerone", "bugcrowd", "intigriti"])
+    bp_submit.add_argument("--program", type=str, required=True, help="Program name")
+    bp_submit.add_argument("--title", type=str, required=True, help="Report title")
+    bp_submit.add_argument("--severity", choices=["critical", "high", "medium", "low", "info"], default="medium")
+    bp_submit.add_argument("--description", type=str, required=True, help="Vulnerability description")
+    bp_match = bounty_sub.add_parser("match", help="Find programs matching a target")
+    bp_match.add_argument("target", help="Target domain/URL")
+
+    # ====================================================================
+    # Autopilot autonomous hunt loop
+    # ====================================================================
+    autopilot_parser = subparsers.add_parser("autopilot", help="Autonomous hunt loop (continuous)")
+    autopilot_parser.add_argument("target", help="Target to hunt")
+    autopilot_parser.add_argument("--waves", type=int, default=5, help="Number of waves (max 10)")
+    autopilot_parser.add_argument("--output", "-o", type=str, default=None, help="Output directory")
+    autopilot_parser.add_argument("--status", action="store_true", help="Show current hunt status")
+    autopilot_parser.add_argument("--resume", action="store_true", help="Resume previous hunt session")
+
+    # ====================================================================
+    # Corpus management (RAG index population)
+    # ====================================================================
+    corpus_parser = subparsers.add_parser("corpus", help="Manage RAG prior-art corpus")
+    corpus_sub = corpus_parser.add_subparsers(dest="corpus_command")
+    corp_populate = corpus_sub.add_parser("populate", help="Build/rebuild RAG index from data sources")
+    corp_populate.add_argument("--max-reports", type=int, default=0, help="Max reports to load (0=all)")
+    corp_populate.add_argument("--force", action="store_true", help="Force rebuild even if index exists")
+    corp_populate.add_argument("--source", choices=["huggingface", "json", "all"], default="all",
+                               help="Data source (default: all)")
+    corp_populate.add_argument("--json-dir", type=str, default=None, help="Path to JSON report directory")
+    corp_refresh = corpus_sub.add_parser("refresh", help="Incremental update from GitHub repos (zzzteph/bugbounty-monitor)")
+    corp_status = corpus_sub.add_parser("status", help="Show corpus statistics")
+    corp_info = corpus_sub.add_parser("info", help="Detailed corpus info")
+
     return parser
 
 
@@ -1096,6 +1140,166 @@ def main(argv: list[str] | None = None):
             click.secho(f"Total: {len(correlations)} correlations", bold=True)
         elif cmd == "list":
             click.echo("Usage: campaign create|add|correlate <name> [target]")
+        return
+
+    # ====================================================================
+    # Bounty: argus bounty search/triage/submit/match
+    # ====================================================================
+    if args.command == "bounty":
+        from argus.mcp.bounty_server import get_bounty_server, BountyReport
+        server = get_bounty_server()
+        cmd = getattr(args, 'bounty_command', '')
+        if cmd == "search":
+            results = asyncio.run(server.search_programs(args.platform, args.query))
+            if results:
+                click.secho(f"\nPrograms on {args.platform}:", bold=True)
+                for p in results:
+                    click.echo(f"  {p['name']:30s} scope={len(p['scope'])} rules bounty=${p.get('max_bounty', 'varies')}")
+            else:
+                click.echo("No programs found")
+        elif cmd == "triage":
+            import json
+            from pathlib import Path
+            finding_path = Path(args.finding_file)
+            if finding_path.exists():
+                finding = json.loads(finding_path.read_text())
+                result = asyncio.run(server.triage_finding(finding))
+                click.secho(f"\nBounty Triage Result:", bold=True)
+                click.echo(f"  Ready: {'✅' if result['bounty_ready'] else '❌'}")
+                click.echo(f"  Severity: {result['severity']}")
+                for issue in result.get('issues', []):
+                    click.secho(f"  ⚠ {issue}", fg="yellow")
+                click.echo(f"  Recommendation: {result['recommendation']}")
+            else:
+                click.secho(f"Finding file not found: {args.finding_file}", fg="red")
+        elif cmd == "submit":
+            report = BountyReport(
+                platform=args.platform, program=args.program,
+                title=args.title, vulnerability="", severity=args.severity,
+                description=args.description,
+            )
+            result = asyncio.run(server.submit_report(args.platform, report))
+            click.secho(f"\nReport submitted:", bold=True)
+            click.echo(f"  Platform: {result['platform']}")
+            click.echo(f"  Title: {result['report_title']}")
+            click.secho(f"  Saved to: {result['saved_to']}", fg="green")
+        elif cmd == "match":
+            matches = asyncio.run(server.find_matching_programs(args.target))
+            if matches:
+                click.secho(f"\nPrograms matching {args.target}:", bold=True)
+                for m in matches:
+                    click.echo(f"  {m['name']:30s} on {m['platform']}")
+                    for s in m.get('scope', [])[:3]:
+                        click.echo(f"    - {s}")
+            else:
+                click.echo("No matching programs found")
+        else:
+            click.echo("Usage: argus bounty search|triage|submit|match")
+        return
+
+    # ====================================================================
+    # Autopilot: argus autopilot <target>
+    # ====================================================================
+    if args.command == "autopilot":
+        from argus.core.autopilot import get_autopilot
+        hunter = get_autopilot(args.target)
+
+        if args.status:
+            s = hunter.summary()
+            click.secho(f"\nAutopilot Status — {s['target']}", bold=True)
+            click.echo(f"  Session: {s['session_id']}")
+            click.echo(f"  Waves: {s['waves']}")
+            click.echo(f"  Endpoints: {s['total_endpoints']}")
+            click.echo(f"  Interesting: {s['interesting_endpoints']}")
+            click.echo(f"  Findings: {s['total_findings']}")
+            click.echo(f"  Active: {'✅' if s['active'] else '❌'}")
+            return
+
+        click.secho(f"\n🚀 Autopilot hunting {args.target}", bold=True, fg="cyan")
+        max_waves = min(args.waves, 10)
+        for wave in range(1, max_waves + 1):
+            if not hunter.should_continue():
+                click.echo("No promising leads, stopping early.")
+                break
+            plan = hunter.wave_plan()
+            click.echo(f"\n{'='*50}")
+            click.secho(f"Wave {plan['wave']}/{max_waves}", bold=True, fg="yellow")
+            click.echo(f"  Agents: {', '.join(plan['agents'])}")
+            click.echo(f"  Endpoints: {len(plan['endpoints'])}")
+            click.echo(f"  Depth: {plan['depth']}")
+            interesting = hunter.get_interesting_endpoints()
+            if interesting:
+                click.echo(f"\n  Hot leads ({len(interesting)}):")
+                for ep in interesting[:3]:
+                    click.echo(f"    🔥 {ep.url} (score: {ep.depth_score:.1f})")
+        s = hunter.summary()
+        click.secho(f"\n✅ Hunt complete: {s['waves']} waves, {s['total_findings']} findings, {s['total_endpoints']} endpoints", bold=True, fg="green")
+        return
+
+    # ====================================================================
+    # Corpus: argus corpus populate|status|info
+    # ====================================================================
+    if args.command == "corpus":
+        from argus.core.rag_search import get_rag_search
+        cmd = getattr(args, 'corpus_command', '')
+        if cmd == "refresh":
+            from argus.core.corpus_populator import refresh_corpus
+            click.secho("Refreshing corpus from GitHub repos (zzzteph/bugbounty-monitor)...", bold=True)
+            total = refresh_corpus()
+            click.secho(f"Refresh complete: {total} total records", bold=True, fg="green")
+        elif cmd == "populate":
+            from argus.core.corpus_populator import populate_from_all_sources, CorpusPopulator
+
+            if args.source == "json" and args.json_dir:
+                pop = CorpusPopulator()
+                n = pop.from_json_dir(args.json_dir, args.max_reports)
+                indexed, elapsed = pop.build_index()
+                click.secho(f"Indexed {indexed} reports from JSON in {elapsed:.1f}s", bold=True, fg="green")
+            elif args.source == "huggingface":
+                n = populate_from_all_sources(max_reports=args.max_reports, force=args.force)
+                click.secho(f"Indexed {n} reports from HuggingFace", bold=True, fg="green")
+            else:
+                n = populate_from_all_sources(max_reports=args.max_reports, force=args.force)
+                click.secho(f"Indexed {n} reports from all sources", bold=True, fg="green")
+
+            rag = get_rag_search()
+            s = rag.status()
+            click.echo(f"RAG status: {s['entries']} entries, FAISS: {s['faiss_available']}")
+
+        elif cmd == "status":
+            from argus.core.corpus_populator import get_corpus_stats
+            stats = get_corpus_stats()
+            if stats["total"] == 0:
+                click.secho("Corpus not built. Run: argus corpus populate", fg="yellow")
+            else:
+                click.secho(f"\nRAG Corpus Status", bold=True)
+                click.echo(f"  Total entries: {stats['total']}")
+                click.echo(f"  Sources: {stats['sources']}")
+                click.echo(f"  Severity breakdown: {stats['severity']}")
+                top_techs = dict(sorted(stats['techniques'].items(), key=lambda x: -x[1])[:10])
+                click.echo(f"  Top techniques: {top_techs}")
+
+        elif cmd == "info":
+            from argus.core.corpus_populator import get_corpus_stats
+            stats = get_corpus_stats()
+            if stats["total"] == 0:
+                click.secho("Corpus not built. Run: argus corpus populate", fg="yellow")
+            else:
+                click.secho("\nCorpus Info", bold=True)
+                click.echo(f"  Entries: {stats['total']}")
+                click.echo(f"  Status: {stats['status']}")
+                click.echo(f"\n  By Source:")
+                for src, cnt in sorted(stats['sources'].items()):
+                    click.echo(f"    {src}: {cnt}")
+                click.echo(f"\n  By Severity:")
+                for sev, cnt in sorted(stats['severity'].items()):
+                    color = {"critical": "red", "high": "red", "medium": "yellow"}.get(sev, "white")
+                    click.secho(f"    {sev}: {cnt}", fg=color)
+                click.echo(f"\n  By Technique (top 15):")
+                for tech, cnt in sorted(stats['techniques'].items(), key=lambda x: -x[1])[:15]:
+                    click.echo(f"    {tech}: {cnt}")
+        else:
+            click.echo("Usage: argus corpus populate|status|info")
         return
 
     # ====================================================================
