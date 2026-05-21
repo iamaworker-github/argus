@@ -58,12 +58,12 @@ Argus automatically detects:
 
 **One-liner (Linux/macOS):**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yourusername/argus/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/iamaworker-github/argus/main/scripts/install.sh | bash
 ```
 
 **Or clone manually:**
 ```bash
-git clone https://github.com/yourusername/argus.git
+git clone https://github.com/iamaworker-github/argus.git
 cd argus
 bash scripts/install.sh --full
 ```
@@ -77,7 +77,7 @@ Argus includes **43 specialized AI agents** for Claude Code that turn it into a 
 bash scripts/install.sh --global
 
 # Or one-liner:
-curl -fsSL https://raw.githubusercontent.com/yourusername/argus/main/scripts/install.sh | bash -s -- --global
+curl -fsSL https://raw.githubusercontent.com/iamaworker-github/argus/main/scripts/install.sh | bash -s -- --global
 ```
 
 Agents include: `web-hunter`, `recon-advisor`, `vuln-scanner`, `exploit-guide`, `ssrf-hunter`, `cloud-security`, `ad-attacker`, and 36 more — covering recon, web app, cloud, AD, mobile, social engineering, forensics, and reporting.
@@ -360,8 +360,8 @@ Apache License 2.0 - See [LICENSE](LICENSE) file for details.
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/argus/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/argus/discussions)
+- **Issues**: [GitHub Issues](https://github.com/iamaworker-github/argus/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/iamaworker-github/argus/discussions)
 
 ## ⭐ Star History
 

@@ -42,7 +42,7 @@ Thank you for your interest in contributing to Argus! This document provides gui
 
 ```bash
 # Clone your fork
-git clone https://github.com/yourusername/argus.git
+git clone https://github.com/iamaworker-github/argus.git
 cd argus
 
 # Create virtual environment

@@ -19,7 +19,7 @@ setup(
     long_description_content_type="text/markdown",
     author="Argus Security Team",
     author_email="security@argus.dev",
-    url="https://github.com/yourusername/argus",
+    url="https://github.com/iamaworker-github/argus",
     packages=find_packages(exclude=["tests", "docs", "examples"]),
     include_package_data=True,
     package_data={

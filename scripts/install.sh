@@ -12,7 +12,7 @@ set -euo pipefail
 
 VERSION="2.0.0"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_URL="https://github.com/yourusername/argus.git"
+REPO_URL="https://github.com/iamaworker-github/argus.git"
 AGENTS_SRC="${SCRIPT_DIR}/../argus/skills"
 GLOBAL_DIR="${HOME}/.claude/agents"
 PROJECT_DIR=".claude/agents"
