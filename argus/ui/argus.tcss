@@ -1,0 +1,837 @@
+/* ============================================================
+   ARGUS v0.8.3 — Autonomous AI Cybersecurity Cockpit
+   Textual CSS Theme — Matrix Green on Pure Black
+   ============================================================ */
+
+Screen {
+    background: #0a0a0a;
+    color: #c8ffc8;
+    layout: vertical;
+}
+
+/* ============================================================
+   TOP HEADER BAR
+   ============================================================ */
+#argus-header {
+    height: 1;
+    width: 100%;
+    background: #050f05;
+    color: #00ff41;
+    padding: 0 1;
+    margin: 0;
+    dock: top;
+    layout: horizontal;
+}
+
+#header-left {
+    height: 100%;
+    width: auto;
+    background: transparent;
+    layout: horizontal;
+}
+
+#brand-name {
+    color: #00ff41;
+    text-style: bold;
+    background: transparent;
+    padding: 0 1 0 0;
+}
+
+#version-badge {
+    color: #4a7a4a;
+    text-style: dim;
+    background: transparent;
+    padding: 0 1 0 0;
+}
+
+#header-subtitle {
+    color: #4a7a4a;
+    text-style: dim;
+    background: transparent;
+    padding: 0 1;
+}
+
+#header-right {
+    height: 100%;
+    width: 1fr;
+    background: transparent;
+    layout: horizontal;
+    align: right middle;
+    padding: 0;
+}
+
+#header-right Static {
+    background: transparent;
+    padding: 0 1;
+    height: 100%;
+}
+
+#op-label, #target-label, #session-label, #time-label {
+    color: #4a7a4a;
+}
+
+#op-value {
+    color: #ffb300;
+    text-style: bold;
+}
+
+#target-value, #session-value {
+    color: #c8ffc8;
+}
+
+#live-timer {
+    color: #c8ffc8;
+    padding: 0 1;
+}
+
+#live-pulse {
+    padding: 0 1;
+}
+
+/* ============================================================
+   MAIN 3-COLUMN LAYOUT
+   ============================================================ */
+#main-content {
+    height: 1fr;
+    width: 100%;
+    background: #0a0a0a;
+    layout: horizontal;
+}
+
+/* ============================================================
+   LEFT PANEL (~20%)
+   ============================================================ */
+#left-panel {
+    width: 20%;
+    min-width: 28;
+    background: #0a0a0a;
+    border-right: solid #1a3a1a;
+    overflow-y: auto;
+    scrollbar-background: #050f05;
+    scrollbar-color: #1a3a1a;
+    scrollbar-corner-color: #0a0a0a;
+    scrollbar-size-vertical: 1;
+}
+
+/* --- Agent Status Card --- */
+#agent-status-card {
+    background: transparent;
+    border-bottom: solid #1a3a1a;
+    padding: 0;
+}
+
+#eagle-logo {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1;
+    background: transparent;
+}
+
+#status-label {
+    color: #4a7a4a;
+    padding: 0 1;
+    background: transparent;
+}
+
+#status-value {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1;
+    background: transparent;
+}
+
+#mode-value, #risk-value, #parallel-value {
+    color: #c8ffc8;
+    padding: 0 1;
+    background: transparent;
+}
+
+#safe-mode-value {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1 1 1;
+    background: transparent;
+    border-bottom: solid #1a3a1a;
+}
+
+/* --- Agent List --- */
+#agent-list {
+    background: transparent;
+    border-bottom: solid #1a3a1a;
+    padding: 0;
+}
+
+#agents-title {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1;
+    background: #050f05;
+    border-bottom: solid #1a3a1a;
+}
+
+.agent-row {
+    color: #c8ffc8;
+    padding: 0 1;
+    background: transparent;
+    height: 1;
+}
+
+.agent-row.selected {
+    background: #0a2a0a;
+    border-left: solid #00ff41;
+}
+
+#agent-list AgentStatusDot {
+    padding: 0 1;
+    background: transparent;
+    height: 1;
+}
+
+#agent-0-name, #agent-1-name, #agent-2-name, #agent-3-name {
+    color: #c8ffc8;
+    padding: 0 1;
+    background: transparent;
+    height: 1;
+}
+
+#agent-0-status, #agent-1-status, #agent-2-status, #agent-3-status {
+    height: 1;
+    background: transparent;
+}
+
+#agent-actions {
+    height: auto;
+    padding: 0 1;
+    background: transparent;
+    border-top: solid #1a3a1a;
+}
+
+#new-agent-btn {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1;
+    background: transparent;
+}
+
+#new-agent-btn:hover {
+    background: #0a2a0a;
+}
+
+#launch-btn {
+    color: #4a7a4a;
+    padding: 0 1;
+    background: transparent;
+}
+
+#agent-tools, #agent-resources {
+    height: auto;
+    padding: 0 1;
+    background: transparent;
+}
+
+#orchestrator-status {
+    color: #c8ffc8;
+    padding: 0 1;
+    background: transparent;
+}
+
+#memory-status, #kb-status {
+    color: #c8ffc8;
+    padding: 0 1;
+    background: transparent;
+}
+
+/* --- System Health --- */
+#sys-health-bars {
+    background: transparent;
+    padding: 0;
+}
+
+#health-title {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1;
+    background: #050f05;
+    border-bottom: solid #1a3a1a;
+}
+
+#cpu-bar, #mem-bar, #net-bar {
+    height: 1;
+    padding: 0 1;
+    background: transparent;
+}
+
+#tokens-line, #credits-line, #uptime-line {
+    color: #c8ffc8;
+    padding: 0 1;
+    background: transparent;
+    height: 1;
+}
+
+/* ============================================================
+   CENTER PANEL (~50%)
+   ============================================================ */
+#center-panel {
+    width: 50%;
+    background: #0a0a0a;
+    border-right: solid #1a3a1a;
+}
+
+/* --- Pipeline Stepper --- */
+#pipeline-stepper {
+    height: 3;
+    background: #050f05;
+    border-bottom: solid #1a3a1a;
+    padding: 0 1;
+    overflow-x: auto;
+    scrollbar-background: #050f05;
+    scrollbar-color: #1a3a1a;
+}
+
+#pipeline-stepper > .pipeline--stage {
+    color: #c8ffc8;
+    padding: 0 1;
+}
+
+/* Connector styling */
+#connector-0, #connector-1, #connector-2, #connector-3, #connector-4 {
+    color: #2a4a2a;
+    padding: 0;
+    height: 1;
+}
+
+/* --- Agent Log Panel --- */
+#agent-log-panel {
+    height: 1fr;
+    background: #0a0a0a;
+    border-bottom: solid #1a3a1a;
+}
+
+#log-title-bar {
+    height: 1;
+    background: #050f05;
+    border-bottom: solid #1a3a1a;
+    padding: 0 1;
+}
+
+#log-agent-name {
+    color: #c8ffc8;
+    text-style: bold;
+    background: transparent;
+    padding: 0 1 0 0;
+}
+
+#log-agent-status {
+    color: #00ff41;
+    text-style: bold;
+    background: transparent;
+    padding: 0 1;
+}
+
+#log-agent-timer {
+    color: #4a7a4a;
+    background: transparent;
+    padding: 0 1;
+    align: right middle;
+}
+
+#agent-log-output {
+    height: 1fr;
+    background: #0a0a0a;
+    color: #c8ffc8;
+    border: none;
+    padding: 0 1;
+    overflow-y: scroll;
+    scrollbar-background: #050f05;
+    scrollbar-color: #1a3a1a;
+    scrollbar-corner-color: #0a0a0a;
+    scrollbar-size-vertical: 1;
+}
+
+/* --- Thinking Box --- */
+#thinking-box {
+    height: auto;
+    background: #050f05;
+    border: solid #1a3a1a;
+    margin: 1;
+}
+
+#thinking-header {
+    height: 1;
+    background: #0a1f0a;
+    border-bottom: solid #1a3a1a;
+    padding: 0 1;
+}
+
+#thinking-title {
+    color: #ffb300;
+    text-style: bold;
+    background: transparent;
+    padding: 0 1 0 0;
+}
+
+#thinking-pulse {
+    color: #00ff41;
+    background: transparent;
+    padding: 0 1;
+}
+
+#thinking-content {
+    background: transparent;
+    padding: 0 1;
+}
+
+.think-line {
+    color: #c8ffc8;
+    padding: 0;
+    background: transparent;
+    height: 1;
+}
+
+#tokens-footer {
+    color: #4a7a4a;
+    text-style: italic;
+    padding: 0 1;
+    background: transparent;
+    border-top: solid #1a3a1a;
+    height: 1;
+    align: right middle;
+}
+
+/* --- Activity Feed --- */
+#activity-feed {
+    height: auto;
+    max-height: 10;
+    background: #0a0a0a;
+    border-top: solid #1a3a1a;
+}
+
+#activity-header {
+    height: 1;
+    background: #050f05;
+    border-bottom: solid #1a3a1a;
+    padding: 0 1;
+}
+
+#activity-title {
+    color: #00ff41;
+    text-style: bold;
+    background: transparent;
+    padding: 0 1 0 0;
+}
+
+#verbosity-selector {
+    color: #ffb300;
+    background: transparent;
+    padding: 0 1;
+    align: right middle;
+}
+
+#activity-table {
+    height: 1fr;
+    background: transparent;
+    color: #c8ffc8;
+    border: none;
+    padding: 0 1;
+}
+
+DataTable {
+    background: transparent;
+    color: #c8ffc8;
+    border: none;
+}
+
+DataTable > .datatable--header {
+    background: transparent;
+    color: #4a7a4a;
+    text-style: dim;
+}
+
+DataTable > .datatable--row {
+    background: transparent;
+    color: #c8ffc8;
+}
+
+DataTable > .datatable--row:hover {
+    background: #0a1f0a;
+}
+
+/* ============================================================
+   RIGHT PANEL (~30%)
+   ============================================================ */
+#right-panel {
+    width: 30%;
+    min-width: 30;
+    background: #0a0a0a;
+    overflow-y: auto;
+    scrollbar-background: #050f05;
+    scrollbar-color: #1a3a1a;
+    scrollbar-corner-color: #0a0a0a;
+    scrollbar-size-vertical: 1;
+}
+
+/* --- Target Overview --- */
+#target-overview {
+    background: transparent;
+    border-bottom: solid #1a3a1a;
+    padding: 0;
+}
+
+#target-overview-title {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1;
+    background: #050f05;
+    border-bottom: solid #1a3a1a;
+}
+
+.target-info {
+    color: #c8ffc8;
+    padding: 0 1;
+    height: 1;
+    background: transparent;
+}
+
+#attack-surface {
+    height: auto;
+    padding: 0 1;
+    background: transparent;
+}
+
+#risk-badge {
+    color: #ffb300;
+    text-style: bold;
+    background: transparent;
+}
+
+/* --- Attack Graph --- */
+#attack-graph {
+    background: transparent;
+    border-bottom: solid #1a3a1a;
+    padding: 0;
+}
+
+#attack-graph-title {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1;
+    background: #050f05;
+    border-bottom: solid #1a3a1a;
+}
+
+#attack-graph-content {
+    color: #c8ffc8;
+    padding: 0 1;
+    background: transparent;
+}
+
+#graph-legend {
+    color: #4a7a4a;
+    padding: 0 1;
+    background: transparent;
+    height: 1;
+}
+
+/* --- Key Findings --- */
+#key-findings {
+    background: transparent;
+    border-bottom: solid #1a3a1a;
+    padding: 0;
+}
+
+#findings-title {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1;
+    background: #050f05;
+    border-bottom: solid #1a3a1a;
+}
+
+.finding-item {
+    color: #c8ffc8;
+    padding: 0 1;
+    height: 1;
+    background: transparent;
+}
+
+#risk-score-panel {
+    background: #0a1f0a;
+    margin: 0 1;
+    padding: 0;
+}
+
+#risk-score-title {
+    color: #4a7a4a;
+    text-style: dim;
+    padding: 0 1;
+    background: transparent;
+}
+
+#risk-score-value {
+    color: #ffb300;
+    text-style: bold;
+    padding: 0 1;
+    background: transparent;
+}
+
+#risk-score-label {
+    color: #ffb300;
+    padding: 0 1;
+    background: transparent;
+}
+
+#risk-score-bar {
+    color: #00ff41;
+    padding: 0 1;
+    background: transparent;
+}
+
+/* --- Top Technologies --- */
+#tech-list {
+    background: transparent;
+    border-bottom: solid #1a3a1a;
+    padding: 0;
+}
+
+#tech-title {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1;
+    background: #050f05;
+    border-bottom: solid #1a3a1a;
+}
+
+.tech-item {
+    color: #c8ffc8;
+    padding: 0 1;
+    height: 1;
+    background: transparent;
+}
+
+/* --- Recent Discoveries --- */
+#recent-discoveries {
+    background: transparent;
+    border-bottom: solid #1a3a1a;
+    padding: 0;
+}
+
+#recent-title {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1;
+    background: #050f05;
+    border-bottom: solid #1a3a1a;
+}
+
+.discovery-item {
+    color: #c8ffc8;
+    padding: 0 1;
+    height: 1;
+    background: transparent;
+}
+
+/* --- Session Metrics --- */
+#session-metrics {
+    background: transparent;
+    border-bottom: solid #1a3a1a;
+    padding: 0;
+}
+
+#metrics-title {
+    color: #00ff41;
+    text-style: bold;
+    padding: 0 1;
+    background: #050f05;
+    border-bottom: solid #1a3a1a;
+}
+
+.metric-item {
+    color: #c8ffc8;
+    padding: 0 1;
+    height: 1;
+    background: transparent;
+}
+
+/* ============================================================
+   BOTTOM INPUT BAR
+   ============================================================ */
+#argus-footer {
+    height: 1;
+    width: 100%;
+    background: #050f05;
+    color: #00ff41;
+    border-top: solid #1a3a1a;
+    padding: 0;
+    margin: 0;
+    dock: bottom;
+    layout: horizontal;
+}
+
+#prompt {
+    color: #00ff41;
+    text-style: bold;
+    background: transparent;
+    padding: 0 0 0 1;
+    height: 100%;
+}
+
+#command-input {
+    height: 1;
+    width: 1fr;
+    background: #050f05;
+    border: none;
+    color: #c8ffc8;
+    padding: 0 1;
+    margin: 0;
+}
+
+#command-input:focus {
+    background: #050f05;
+}
+
+#command-input > .input--placeholder {
+    color: #4a7a4a;
+    text-style: italic;
+}
+
+#command-input > .input--cursor {
+    background: #00ff41;
+    color: #0a0a0a;
+    text-style: bold;
+}
+
+#help-hint, #tab-hint, #cmd-hint, #exit-hint {
+    color: #4a7a4a;
+    background: transparent;
+    padding: 0 1;
+    height: 100%;
+}
+
+#help-hint:hover, #tab-hint:hover, #cmd-hint:hover, #exit-hint:hover {
+    color: #c8ffc8;
+}
+
+/* ============================================================
+   MODAL SCREENS
+   ============================================================ */
+ModalScreen {
+    align: center middle;
+}
+
+/* ============================================================
+   SCROLLBARS
+   ============================================================ */
+Scrollbar {
+    scrollbar-background: #050f05;
+    scrollbar-color: #1a3a1a;
+    scrollbar-corner-color: #0a0a0a;
+}
+
+/* ============================================================
+   GENERAL PANEL STYLING
+   ============================================================ */
+.panel {
+    border: solid #1a3a1a;
+    background: #050f05;
+    padding: 0 1;
+}
+
+.panel-title {
+    color: #00ff41;
+    text-style: bold;
+}
+
+.status-running {
+    color: #00ff41;
+    text-style: bold;
+}
+
+.status-queued {
+    color: #ffb300;
+}
+
+.status-error {
+    color: #ff4444;
+}
+
+.agent-selected {
+    background: #0a2a0a;
+    border-left: solid #00ff41;
+}
+
+.pipeline-complete {
+    color: #00ff41;
+}
+
+.pipeline-current {
+    color: #ffb300;
+}
+
+.pipeline-pending {
+    color: #2a4a2a;
+}
+
+.risk-medium {
+    color: #ffb300;
+    text-style: bold;
+}
+
+/* RichLog styling */
+RichLog {
+    background: #0a0a0a;
+    color: #c8ffc8;
+    border: none;
+}
+
+RichLog:focus {
+    border: none;
+}
+
+/* ProgressBar */
+ProgressBar {
+    color: #00ff41;
+    background: transparent;
+}
+
+ProgressBar > .bar--bar {
+    color: #00ff41;
+    background: #1a3a1a;
+}
+
+ProgressBar > .bar--complete {
+    color: #00ff41;
+}
+
+/* Button */
+Button {
+    background: transparent;
+    color: #00ff41;
+    border: none;
+    text-style: bold;
+    padding: 0 1;
+    margin: 0;
+}
+
+Button:hover {
+    background: #0a1f0a;
+}
+
+Button.-success {
+    background: #00ff41;
+    color: #0a0a0a;
+}
+
+Button.-error {
+    color: #ff4444;
+}
+
+/* Label */
+Label {
+    background: transparent;
+    color: #c8ffc8;
+}
+
+/* Static text defaults */
+Static {
+    background: transparent;
+}

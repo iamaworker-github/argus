@@ -1,0 +1,359 @@
+/* STRIX terminal cockpit: compact, matte, operator-dense. */
+
+Screen {
+    background: #05070b;
+    color: #d1d5db;
+}
+
+#topbar {
+    width: 100%;
+    height: 1;
+    background: #05070b;
+    border-bottom: solid #1f2a38;
+    padding: 0 0;
+}
+
+#brand {
+    width: 8;
+    color: #ffffff;
+    text-style: bold;
+    content-align: center middle;
+}
+
+#version-pill {
+    width: 7;
+    color: #aab2c0;
+    background: #0d1420;
+    content-align: center middle;
+}
+
+#subtitle {
+    width: 1fr;
+    color: #aab2c0;
+    padding: 0 1;
+    content-align: left middle;
+}
+
+#operation,
+#target-pill,
+#session-pill,
+#model-pill,
+#clock,
+#token-pill {
+    width: auto;
+    min-width: 13;
+    padding: 0 1;
+    content-align: center middle;
+    border-left: solid #1f2a38;
+}
+
+#model-pill {
+    min-width: 18;
+}
+
+#token-pill {
+    min-width: 13;
+}
+
+#live {
+    width: 8;
+    color: #39d353;
+    text-style: bold;
+    content-align: center middle;
+    border-left: solid #1f2a38;
+}
+
+#main {
+    width: 100%;
+    height: 1fr;
+    padding: 0 0 0 0;
+    background: #05070b;
+}
+
+#left {
+    width: 24%;
+    min-width: 42;
+    height: 100%;
+    margin: 0 0 0 0;
+    padding: 0 0 0 0;
+}
+
+#center {
+    width: 55%;
+    height: 100%;
+    margin: 0 0;
+}
+
+#right {
+    width: 21%;
+    min-width: 36;
+    height: 100%;
+}
+
+.panel {
+    width: 100%;
+    background: #090d14;
+    border: solid #27384a;
+    margin-bottom: 0;
+}
+
+.panel-title {
+    height: 1;
+    width: 100%;
+    color: #58a6ff;
+    text-style: bold;
+    padding: 0 1;
+    border-bottom: solid #1f2a38;
+}
+
+.status-panel {
+    height: 10;
+}
+
+#status-head-content {
+    height: 1fr;
+    padding: 1 0;
+    content-align: center middle;
+}
+
+.agents-panel {
+    height: 16;
+}
+
+#agent-list {
+    height: 1fr;
+    padding: 0 0;
+    color: #d1d5db;
+}
+
+.system-panel {
+    height: 1fr;
+}
+
+#syshealth {
+    height: 1fr;
+    padding: 1 0;
+}
+
+#syshealth,
+#intel,
+#tech,
+#discoveries,
+#smetrics {
+    height: 1fr;
+    padding: 0 1;
+}
+
+#surface,
+#attack-paths,
+#validation,
+#intelligence {
+    height: 1fr;
+    padding: 0 1;
+}
+
+.pipeline-panel {
+    height: 4;
+}
+
+#pipeline {
+    height: 1fr;
+    padding: 0 1;
+    content-align: center middle;
+}
+
+#work-grid {
+    width: 100%;
+    height: 1fr;
+}
+
+#work-left {
+    width: 52%;
+    height: 100%;
+    margin-right: 0;
+}
+
+#work-right {
+    width: 48%;
+    height: 100%;
+}
+
+.exec-panel {
+    height: 41%;
+}
+
+.thinking-panel {
+    height: 24%;
+    border: solid #58a6ff;
+}
+
+.activity-panel {
+    height: 1fr;
+}
+
+.graph-panel {
+    height: 59%;
+}
+
+.findings-panel {
+    height: 1fr;
+}
+
+#exec,
+#feed {
+    width: 100%;
+    height: 1fr;
+    padding: 0 1;
+    background: transparent;
+    color: #d1d5db;
+}
+
+#think,
+#graph,
+#find {
+    width: 100%;
+    height: 1fr;
+    padding: 0 1;
+    background: transparent;
+}
+
+.target-panel {
+    height: 29%;
+}
+
+.tech-panel {
+    height: 19%;
+}
+
+.discoveries-panel {
+    height: 21%;
+}
+
+.attack-paths-panel {
+    height: 16%;
+}
+
+.validation-panel {
+    height: 12%;
+}
+
+.intelligence-panel {
+    height: 14%;
+}
+
+.metrics-panel {
+    height: 1fr;
+}
+
+#commandbar {
+    height: 1;
+    width: 100%;
+    margin: 0 0 0 0;
+    background: #090d14;
+    border: none;
+    border-top: solid #27384a;
+}
+
+#prompt {
+    width: 19;
+    color: #39d353;
+    text-style: bold;
+    padding: 0 1;
+    content-align: left middle;
+}
+
+#cmd {
+    width: 1fr;
+    height: 100%;
+    background: #090d14;
+    color: #d1d5db;
+    border: none;
+    padding: 0 1;
+}
+
+#command-help {
+    width: auto;
+    min-width: 64;
+    height: 100%;
+    color: #7b8494;
+    content-align: right middle;
+    padding: 0 1;
+}
+
+#cmd:focus {
+    border: none;
+}
+
+#main.full #left {
+    display: none;
+}
+
+#main.full #right {
+    display: none;
+}
+
+#main.full #center {
+    width: 100%;
+    margin: 0;
+}
+
+RichLog {
+    background: transparent;
+}
+
+Static {
+    background: transparent;
+}
+
+Input {
+    background: #090d14;
+    color: #d1d5db;
+}
+
+Scrollbar {
+    background: #090d14;
+}
+
+Scrollbar > .thumb {
+    background: #27384a;
+}
+
+.qx {
+    width: 48;
+    height: 9;
+    background: #090d14;
+    border: solid #58a6ff;
+    padding: 1 2;
+    align: center middle;
+}
+
+.qt {
+    width: 100%;
+    height: 1;
+    text-align: center;
+    color: #d1d5db;
+    text-style: bold;
+}
+
+.qs {
+    width: 100%;
+    height: 2;
+    text-align: center;
+    color: #7b8494;
+}
+
+.qb {
+    width: 100%;
+    height: 3;
+    align: center middle;
+}
+
+Button {
+    margin: 0 1;
+    background: #0d1420;
+    color: #d1d5db;
+}
+
+Button:hover {
+    border: solid #58a6ff;
+}
