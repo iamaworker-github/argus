@@ -77,12 +77,6 @@ class AIPortScannerAgent(BaseAgent):
 
     async def _run_nmap_scan(self) -> None:
         try:
-            nmap_bin = subprocess.run(["which", "nmap"], capture_output=True, text=True).stdout.strip()
-            if not nmap_bin:
-                logger.warning("nmap not found, using basic TCP scan")
-                await self._basic_tcp_scan()
-                return
-
             cmd = f"nmap {self.nmap_flags} -oX - {self.target}".split()
             logger.info(f"{self.name}: Running: {' '.join(cmd)}")
 
@@ -106,11 +100,9 @@ class AIPortScannerAgent(BaseAgent):
                             })
 
         except asyncio.TimeoutError:
-            logger.warning(f"{self.name}: Nmap timed out, trying basic scan")
-            await self._basic_tcp_scan()
+            logger.error(f"{self.name}: Nmap timed out — no fallback scan")
         except Exception as e:
-            logger.warning(f"{self.name}: Nmap failed ({e}), trying basic scan")
-            await self._basic_tcp_scan()
+            logger.error(f"{self.name}: Nmap failed ({e}) — no fallback scan")
 
     def _parse_nmap_xml(self, xml_content: str) -> None:
         import xml.etree.ElementTree as ET
@@ -135,29 +127,3 @@ class AIPortScannerAgent(BaseAgent):
                         self.open_ports.append(entry)
         except Exception as e:
             logger.debug(f"XML parse failed: {e}")
-
-    async def _basic_tcp_scan(self) -> None:
-        import socket
-        common = [21, 22, 23, 25, 53, 80, 110, 143, 443, 445, 993, 995, 1433,
-                  1521, 2049, 3306, 3389, 5432, 5900, 6379, 8080, 8443, 27017]
-        service_map = {21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 53: "DNS",
-                       80: "HTTP", 110: "POP3", 143: "IMAP", 443: "HTTPS", 445: "SMB",
-                       1433: "MSSQL", 1521: "Oracle", 2049: "NFS", 3306: "MySQL",
-                       3389: "RDP", 5432: "PostgreSQL", 5900: "VNC", 6379: "Redis",
-                       8080: "HTTP-Alt", 8443: "HTTPS-Alt", 27017: "MongoDB"}
-        for port in common:
-            try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.settimeout(2)
-                result = sock.connect_ex((self.target, port))
-                if result == 0:
-                    self.open_ports.append({
-                        "port": port,
-                        "protocol": "tcp",
-                        "state": "open",
-                        "service": service_map.get(port, "unknown"),
-                        "product": "", "version": "",
-                    })
-                sock.close()
-            except Exception:
-                pass

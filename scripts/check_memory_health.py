@@ -53,10 +53,10 @@ async def check_health():
             result = await session.run("RETURN 1 as num")
             record = await result.single()
             assert record["num"] == 1
-        print("  ✓ Connected")
-        print(f"  ✓ URI: {neo4j_uri}")
+        print("  \u2713 Connected")
+        print(f"  \u2713 URI: {neo4j_uri}")
     except Exception as e:
-        print(f"  ✗ Failed: {e}")
+        print(f"  \u2717 Failed: {e}")
         all_healthy = False
 
     print()
@@ -65,13 +65,13 @@ async def check_health():
     print("Qdrant:")
     try:
         collections = memory_manager.qdrant_client.get_collections()
-        print("  ✓ Connected")
-        print(f"  ✓ Host: {qdrant_host}:{qdrant_port}")
-        print(f"  ✓ Collections: {len(collections.collections)}")
+        print("  \u2713 Connected")
+        print(f"  \u2713 Host: {qdrant_host}:{qdrant_port}")
+        print(f"  \u2713 Collections: {len(collections.collections)}")
         for collection in collections.collections:
             print(f"    - {collection.name}")
     except Exception as e:
-        print(f"  ✗ Failed: {e}")
+        print(f"  \u2717 Failed: {e}")
         all_healthy = False
 
     print()
@@ -80,15 +80,15 @@ async def check_health():
     print("Redis:")
     try:
         pong = await memory_manager.redis_client.ping()
-        print(f"  ✓ Connected (ping={pong})")
-        print(f"  ✓ URL: {redis_url}")
+        print(f"  \u2713 Connected (ping={pong})")
+        print(f"  \u2713 URL: {redis_url}")
 
         # Get info
         info = await memory_manager.redis_client.info("memory")
         used_memory = info.get("used_memory_human", "unknown")
-        print(f"  ✓ Memory used: {used_memory}")
+        print(f"  \u2713 Memory used: {used_memory}")
     except Exception as e:
-        print(f"  ✗ Failed: {e}")
+        print(f"  \u2717 Failed: {e}")
         all_healthy = False
 
     print()
@@ -103,7 +103,7 @@ async def check_health():
         print(f"  Cache misses: {stats['cache_misses']}")
         print(f"  Errors: {stats['errors']}")
     except Exception as e:
-        print(f"  ✗ Failed to get stats: {e}")
+        print(f"  \u2717 Failed to get stats: {e}")
 
     print()
 
@@ -113,12 +113,12 @@ async def check_health():
     # Summary
     print("=" * 60)
     if all_healthy:
-        print("✓ All systems healthy")
+        print("\u2713 All systems healthy")
         print("=" * 60)
         print()
         return 0
     else:
-        print("✗ Some systems unhealthy")
+        print("\u2717 Some systems unhealthy")
         print("=" * 60)
         print()
         print("Troubleshooting:")

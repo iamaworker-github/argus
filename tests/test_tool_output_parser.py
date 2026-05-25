@@ -1,5 +1,6 @@
 """Tests for Tool Output Parser."""
 
+import json
 import pytest
 from argus.core.tool_output_parser import ToolOutputParser, ParsedFinding
 from argus.core.graph_memory import EntityType, RelationType, get_graph_memory
@@ -106,6 +107,3 @@ def test_clear(parser):
     assert len(parser.get_findings()) > 0
     parser.clear()
     assert len(parser.get_findings()) == 0
-
-
-import json

@@ -133,4 +133,4 @@ By contributing, you agree that your contributions will be licensed under the Ap
 
 Open an issue or start a discussion on GitHub.
 
-Thank you for contributing to Argus! 🎯
+Thank you for contributing to Argus!

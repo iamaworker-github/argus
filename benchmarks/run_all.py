@@ -70,7 +70,7 @@ def main():
             cur_passed = cur.get("passed", 0)
             delta = cur_passed - bl_passed
             sign = "+" if delta >= 0 else ""
-            print(f"  {suite}: {bl_passed} → {cur_passed} ({sign}{delta})")
+            print(f"  {suite}: {bl_passed} \u2192 {cur_passed} ({sign}{delta})")
 
     return 0 if all(r["failed"] == 0 for r in all_results.values()) else 1
 

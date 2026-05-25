@@ -6,7 +6,7 @@ VERSION="${1:-latest}"
 REGISTRY="${2:-docker.io}"
 REPO="${3:-argus-security/argus}"
 
-echo "🏗️ Building Argus v${VERSION}..."
+echo "Building Argus v${VERSION}..."
 echo "   Registry: ${REGISTRY}"
 echo "   Repo:     ${REPO}"
 echo ""
@@ -20,27 +20,27 @@ docker build \
     .
 
 echo ""
-echo "✅ Built: ${REPO}:${VERSION}"
+echo "Built: ${REPO}:${VERSION}"
 echo ""
 
 # Build full image (includes nuclei, httpx, nmap)
-echo "🏗️ Building full image (with heavy tools)..."
+echo "Building full image (with heavy tools)..."
 docker build \
     --target full \
     -t "${REPO}:${VERSION}-full" \
     -t "${REPO}:full" \
     .
-echo "✅ Built: ${REPO}:${VERSION}-full"
+echo "Built: ${REPO}:${VERSION}-full"
 echo ""
 
 # Push if requested
 if [ -n "${DOCKER_PUSH}" ]; then
-    echo "📤 Pushing to ${REGISTRY}..."
+    echo "Pushing to ${REGISTRY}..."
     docker push "${REPO}:${VERSION}"
     docker push "${REPO}:latest"
     docker push "${REPO}:${VERSION}-full"
     docker push "${REPO}:full"
-    echo "✅ Pushed!"
+    echo "Pushed!"
 fi
 
 echo ""

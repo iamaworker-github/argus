@@ -65,16 +65,16 @@ async def main():
         print("Verifying connections...")
         stats = await memory_manager.get_stats()
 
-        print(f"  ✓ Neo4j: {'Connected' if stats['neo4j_connected'] else 'Failed'}")
-        print(f"  ✓ Qdrant: {'Connected' if stats['qdrant_connected'] else 'Failed'}")
-        print(f"  ✓ Redis: {'Connected' if stats['redis_connected'] else 'Failed'}")
+        print(f"  \u2713 Neo4j: {'Connected' if stats['neo4j_connected'] else 'Failed'}")
+        print(f"  \u2713 Qdrant: {'Connected' if stats['qdrant_connected'] else 'Failed'}")
+        print(f"  \u2713 Redis: {'Connected' if stats['redis_connected'] else 'Failed'}")
         print()
 
         # Close
         await memory_manager.close()
 
         print("=" * 60)
-        print("✓ Memory System initialized successfully!")
+        print("\u2713 Memory System initialized successfully!")
         print("=" * 60)
         print()
         print("Next steps:")
@@ -86,7 +86,7 @@ async def main():
     except Exception as e:
         print()
         print("=" * 60)
-        print("✗ Initialization failed!")
+        print("\u2717 Initialization failed!")
         print("=" * 60)
         print(f"Error: {e}")
         print()

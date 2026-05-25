@@ -114,7 +114,6 @@ def test_path_finding(graph):
 
     paths = graph.find_paths(a.id, e.id, max_depth=4)
     assert len(paths) >= 1
-    # Path should be Alice → email → domain → org (or Alice → email → domain directly if connection exists)
 
 
 def test_feedback_loop(graph):

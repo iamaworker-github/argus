@@ -75,6 +75,10 @@ setup(
             "opentelemetry-api>=1.22.0",
             "opentelemetry-sdk>=1.22.0",
         ],
+        "web": [
+            "fastapi>=0.136.0",
+            "uvicorn>=0.48.0",
+        ],
         "all": [
             "medusa-security>=2026.5.0",
             "redis>=5.0.0",

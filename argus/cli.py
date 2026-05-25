@@ -159,17 +159,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     tui_parser = subparsers.add_parser("tui", help="Launch interactive TUI for scanning")
     tui_parser.add_argument("target", nargs="?", default=None, help="Optional target for the TUI")
-    tui_parser.add_argument("--strix", "-s", action="store_true", help="Use Strix-inspired UI (default)")
-
-    # ====================================================================
-    # MCP server subcommand
-    # ====================================================================
-    mcp_parser = subparsers.add_parser("mcp", help="MCP server for Claude/Cursor integration")
-    mcp_sub = mcp_parser.add_subparsers(dest="mcp_command")
-    serve_parser = mcp_sub.add_parser("serve", help="Start MCP server")
-    serve_parser.add_argument("--type", dest="transport", type=str, choices=["stdio", "sse"],
-                              default="stdio", help="Transport type: stdio (for Claude Desktop) or sse (for remote)")
-    serve_parser.add_argument("--port", type=int, default=8000, help="Port for SSE transport (default: 8000)")
 
     # ====================================================================
     # Medusa scan subcommand
@@ -189,18 +178,6 @@ def build_parser() -> argparse.ArgumentParser:
     skills_list.add_argument("--category", "-c", type=str, default=None, help="Filter by category")
     skills_search = skills_sub.add_parser("search", help="Search skills by keyword")
     skills_search.add_argument("query", help="Search query")
-
-    # ====================================================================
-    # REST API Server
-    # ====================================================================
-    api_parser = subparsers.add_parser("api", help="Start REST API server")
-    api_parser.add_argument("--host", type=str, default="127.0.0.1", help="Bind address")
-    api_parser.add_argument("--port", type=int, default=8484, help="Bind port")
-
-    # ====================================================================
-    # REPL Shell
-    # ====================================================================
-    subparsers.add_parser("repl", help="Start interactive REPL shell")
 
     # ====================================================================
     # Monitor
@@ -228,13 +205,6 @@ def build_parser() -> argparse.ArgumentParser:
     camp_corr = campaign_sub.add_parser("correlate", help="Run correlations")
     camp_corr.add_argument("name", help="Campaign name")
     camp_list = campaign_sub.add_parser("list", help="List campaigns")
-
-    # ====================================================================
-    # Graph visualization
-    # ====================================================================
-    graph_parser = subparsers.add_parser("graph", help="Attack graph visualization")
-    graph_parser.add_argument("--output", "-o", type=str, default="attack_graph.html",
-                              help="Output HTML file path")
 
     # ====================================================================
     # Bug bounty commands
@@ -279,6 +249,20 @@ def build_parser() -> argparse.ArgumentParser:
     corp_refresh = corpus_sub.add_parser("refresh", help="Incremental update from GitHub repos (zzzteph/bugbounty-monitor)")
     corp_status = corpus_sub.add_parser("status", help="Show corpus statistics")
     corp_info = corpus_sub.add_parser("info", help="Detailed corpus info")
+
+    # ====================================================================
+    # Web Dashboard — same flags as strix for scan-on-start
+    # ====================================================================
+    web_parser = subparsers.add_parser("web", help="Start web dashboard")
+    web_parser.add_argument("--host", type=str, default="0.0.0.0", help="Bind address")
+    web_parser.add_argument("--port", type=int, default=8484, help="Bind port")
+    web_parser.add_argument("--target", "-t", type=str, default=None,
+                            help="Target to scan (URL, domain, IP, directory)")
+    web_parser.add_argument("--scan-mode", "-m", type=str, choices=["quick", "standard", "deep"],
+                            default="deep", help="Scan depth")
+    web_parser.add_argument("--mode", type=str, choices=["osint", "bugbounty", "ctf", "pentest", "api-pentest"],
+                            default="pentest", help="Scan mode")
+    web_parser.add_argument("--parallel", action="store_true", help="Run agents in parallel")
 
     return parser
 
@@ -576,6 +560,8 @@ async def run_scan(
     strict_poc: str = "shadow",
     profile: Optional[str] = None,
     checkpoint: bool = False,
+    event_bus=None,
+    _from_web: bool = False,
 ):
     """Run security scan - Strix-compatible with telemetry."""
     from argus.core.telemetry import get_tracer, trace
@@ -608,6 +594,7 @@ async def run_scan(
             instruction=instruction,
             sub_mode=sub_mode,
             scope_validator=scope_validator,
+            event_bus=event_bus,
             akto_dashboard_url=akto_dashboard_url,
             akto_api_key=akto_api_key,
         )
@@ -669,14 +656,15 @@ async def run_scan(
         print_summary(result)
 
         # Strix exit code: 2 when vulnerabilities found in non-interactive mode
-        if non_interactive and result.total_findings > 0:
+        if non_interactive and result.total_findings > 0 and not _from_web:
             sys.exit(2)
 
         tracer.end_span(scan_trace, status="ok")
     except KeyboardInterrupt:
-        tracer.end_span(scan_trace, status="cancelled", error="User interrupt")
-        logger.warning("Scan interrupted by user")
-        sys.exit(1)
+        if not _from_web:
+            tracer.end_span(scan_trace, status="cancelled", error="User interrupt")
+            logger.warning("Scan interrupted by user")
+            sys.exit(1)
     except Exception as e:
         tracer.end_span(scan_trace, status="error", error=str(e))
         logger.error(f"Scan failed: {e}")
@@ -745,21 +733,7 @@ def print_summary(result):
 
 
 def launch_tui(target: str | None):
-    """Launch the StrixUI (with ModeSelectionScreen), or Cockpit if target provided."""
-    # Default to StrixApp (has ModeSelectionScreen + SplashScreen)
-    if target is None:
-        from argus.ui.strix_app import run_strix_ui
-        run_strix_ui(target)
-        return
-
-    # Target diya hai to cockpit try karo, nahi to StrixApp
-    try:
-        from argus.ui.strix_cockpit import run_strix_cockpit
-        run_strix_cockpit(target)
-        return
-    except Exception:
-        logger.debug("StrixCockpit unavailable, falling back to StrixUI")
-
+    """Launch the StrixUI TUI."""
     from argus.ui.strix_app import run_strix_ui
     run_strix_ui(target)
 
@@ -849,15 +823,6 @@ def main(argv: list[str] | None = None):
     # Strix-compatible command: argus strix --target <target>
     # ====================================================================
     if args.command == "strix":
-        # Strix-compatible: launch TUI by default, headless only with --non-interactive
-        if not args.non_interactive:
-            output_dir = Path(args.output) if args.output else Path("./argus_results")
-            set_config(verbose=args.verbose, headless_browser=args.headless,
-                        output_dir=output_dir)
-            setup_logging(output_dir, args.verbose)
-            launch_tui(args.target)
-            return
-
         print_banner()
 
         # Process instruction file
@@ -982,17 +947,6 @@ def main(argv: list[str] | None = None):
         return
 
     # ====================================================================
-    # MCP server command
-    # ====================================================================
-    if args.command == "mcp":
-        if args.mcp_command == "serve":
-            from argus.mcp.server import run_mcp_server
-            asyncio.run(run_mcp_server(transport=args.transport, port=args.port))
-        else:
-            print("Usage: argus mcp serve --type stdio|sse")
-        return
-
-    # ====================================================================
     # Medusa standalone command
     # ====================================================================
     if args.command == "medusa":
@@ -1063,32 +1017,6 @@ def main(argv: list[str] | None = None):
         return
 
     # ====================================================================
-    # REST API: argus api --host 0.0.0.0 --port 8484
-    # ====================================================================
-    if args.command == "api":
-        host = getattr(args, 'host', '127.0.0.1')
-        port = getattr(args, 'port', 8484)
-        try:
-            from argus.core.rest_api import RESTAPI
-            api = RESTAPI(host=host, port=port)
-            click.secho(f"REST API: http://{host}:{port}", bold=True, fg="green")
-            asyncio.run(api.start())
-        except ImportError:
-            click.secho("Install: pip install fastapi uvicorn", fg="red")
-        return
-
-    # ====================================================================
-    # REPL: argus repl
-    # ====================================================================
-    if args.command == "repl":
-        try:
-            from argus.ui.repl import start_repl
-            start_repl()
-        except ImportError:
-            click.secho("REPL requires readline support", fg="red")
-        return
-
-    # ====================================================================
     # Monitor: argus monitor add/list/remove
     # ====================================================================
     if args.command == "monitor":
@@ -1131,7 +1059,6 @@ def main(argv: list[str] | None = None):
         elif cmd == "correlate":
             camp = CampaignManager(name=args.name)
             click.secho(f"Running correlations for campaign '{args.name}'...", bold=True)
-            import asyncio
             correlations = asyncio.run(camp.correlate_all())
             for c in correlations:
                 sev_color = {"critical": "red", "high": "red", "medium": "yellow", "low": "white"}.get(c.severity, "white")
@@ -1140,61 +1067,6 @@ def main(argv: list[str] | None = None):
             click.secho(f"Total: {len(correlations)} correlations", bold=True)
         elif cmd == "list":
             click.echo("Usage: campaign create|add|correlate <name> [target]")
-        return
-
-    # ====================================================================
-    # Bounty: argus bounty search/triage/submit/match
-    # ====================================================================
-    if args.command == "bounty":
-        from argus.mcp.bounty_server import get_bounty_server, BountyReport
-        server = get_bounty_server()
-        cmd = getattr(args, 'bounty_command', '')
-        if cmd == "search":
-            results = asyncio.run(server.search_programs(args.platform, args.query))
-            if results:
-                click.secho(f"\nPrograms on {args.platform}:", bold=True)
-                for p in results:
-                    click.echo(f"  {p['name']:30s} scope={len(p['scope'])} rules bounty=${p.get('max_bounty', 'varies')}")
-            else:
-                click.echo("No programs found")
-        elif cmd == "triage":
-            import json
-            from pathlib import Path
-            finding_path = Path(args.finding_file)
-            if finding_path.exists():
-                finding = json.loads(finding_path.read_text())
-                result = asyncio.run(server.triage_finding(finding))
-                click.secho(f"\nBounty Triage Result:", bold=True)
-                click.echo(f"  Ready: {'✅' if result['bounty_ready'] else '❌'}")
-                click.echo(f"  Severity: {result['severity']}")
-                for issue in result.get('issues', []):
-                    click.secho(f"  ⚠ {issue}", fg="yellow")
-                click.echo(f"  Recommendation: {result['recommendation']}")
-            else:
-                click.secho(f"Finding file not found: {args.finding_file}", fg="red")
-        elif cmd == "submit":
-            report = BountyReport(
-                platform=args.platform, program=args.program,
-                title=args.title, vulnerability="", severity=args.severity,
-                description=args.description,
-            )
-            result = asyncio.run(server.submit_report(args.platform, report))
-            click.secho(f"\nReport submitted:", bold=True)
-            click.echo(f"  Platform: {result['platform']}")
-            click.echo(f"  Title: {result['report_title']}")
-            click.secho(f"  Saved to: {result['saved_to']}", fg="green")
-        elif cmd == "match":
-            matches = asyncio.run(server.find_matching_programs(args.target))
-            if matches:
-                click.secho(f"\nPrograms matching {args.target}:", bold=True)
-                for m in matches:
-                    click.echo(f"  {m['name']:30s} on {m['platform']}")
-                    for s in m.get('scope', [])[:3]:
-                        click.echo(f"    - {s}")
-            else:
-                click.echo("No matching programs found")
-        else:
-            click.echo("Usage: argus bounty search|triage|submit|match")
         return
 
     # ====================================================================
@@ -1303,17 +1175,42 @@ def main(argv: list[str] | None = None):
         return
 
     # ====================================================================
-    # Graph: argus graph --output graph.html
+    # Web Dashboard: argus web --port 8484 -t target.com --mode pentest
     # ====================================================================
-    if args.command == "graph":
-        try:
-            from argus.ui.attack_graph import AttackGraphVisualizer
-            viz = AttackGraphVisualizer()
-            output = getattr(args, 'output', 'attack_graph.html')
-            viz.generate_html(output_path=output)
-            click.secho(f"Attack graph saved: {output}", fg="green")
-        except Exception as e:
-            click.secho(f"Error: {e}", fg="red")
+    if args.command == "web":
+        host = getattr(args, 'host', '0.0.0.0')
+        port = getattr(args, 'port', 8484)
+        target = getattr(args, 'target', None)
+
+        import argus.web_server as ws
+
+        # If target provided, set up scan state and pending scan before starting server
+        if target:
+            import uuid
+            session_id = uuid.uuid4().hex[:8]
+            ws.dashboard_state.update({
+                "target": target,
+                "mode": getattr(args, 'mode', 'pentest').upper(),
+                "sessionId": session_id,
+                "agentStatus": "PLANNING",
+                "commandsExecuted": 0,
+                "dataCollected": "0 MB",
+                "findingsCount": 0,
+                "findings": [],
+                "logs": [],
+                "thinkingLines": [],
+                "activities": [],
+                "discoveries": [],
+            })
+
+            # Schedule scan to start when server is ready (via startup event)
+            ws._pending_scan = {
+                "target": target,
+                "mode": getattr(args, 'mode', 'pentest'),
+                "session_id": session_id,
+            }
+
+        ws.run_server(host=host, port=port)
         return
 
     parser.error("Unknown command")

@@ -1,5 +1,4 @@
-"""
-Unit tests for Event Bus system
+"""Unit tests for Event Bus system
 
 Tests cover:
 - Event publishing and delivery

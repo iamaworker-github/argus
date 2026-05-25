@@ -1538,6 +1538,7 @@ class ArgusStrixApp(App):
     def action_toggle_help(self) -> None:
         """Show help dialog"""
         # Push the Strix‑style help screen
+        from argus.ui.strix_style.help_screen import HelpScreen
         self.push_screen(HelpScreen())
 
     def action_show_mode_selector(self) -> None:

@@ -2,7 +2,7 @@
 Reconnaissance agent for information gathering
 """
 
-import asyncio
+
 from typing import List, Dict, Any
 import httpx
 import dns.resolver
@@ -37,9 +37,6 @@ class ReconAgent(BaseAgent):
 
         # Endpoint discovery
         await self._discover_endpoints()
-
-        # Port scanning (basic)
-        await self._basic_port_scan()
 
         return AgentResult(
             agent_name=self.name,
@@ -203,35 +200,3 @@ class ReconAgent(BaseAgent):
             "/config", "/backup", "/test", "/debug", "/robots.txt",
             "/sitemap.xml", "/swagger", "/graphql", "/api/docs"
         ]
-
-    async def _basic_port_scan(self) -> None:
-        """Basic port scanning for common services"""
-        common_ports = [80, 443, 22, 21, 3306, 5432, 6379, 27017]
-
-        open_ports = []
-        for port in common_ports:
-            try:
-                reader, writer = await asyncio.wait_for(
-                    asyncio.open_connection(self.target, port),
-                    timeout=2.0
-                )
-                open_ports.append(port)
-                writer.close()
-                await writer.wait_closed()
-                logger.debug(f"Port {port} is open")
-            except:
-                pass
-
-        if open_ports:
-            # Flag non-standard open ports
-            risky_ports = [port for port in open_ports if port not in [80, 443]]
-            if risky_ports:
-                self.add_finding(Finding(
-                    title="Non-standard ports open",
-                    description=f"Found {len(risky_ports)} non-standard open ports",
-                    severity="low",
-                    category="recon",
-                    evidence=f"Open ports: {', '.join(map(str, risky_ports))}",
-                    remediation="Review and close unnecessary ports",
-                    confidence=1.0,
-                ))
