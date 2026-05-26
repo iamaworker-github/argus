@@ -11,7 +11,7 @@ export default function PipelineBar({ stages }: Props) {
       <div className="flex items-start gap-0">
         {stages.map((stage, i) => {
           const pct = stage.total > 0 ? (stage.completed / stage.total) * 100 : 0;
-          const isActive = stage.completed > 0 && stage.completed < stage.total;
+          const isActive = stage.active ?? (stage.completed > 0 && stage.completed < stage.total);
           const isDone = stage.completed === stage.total && stage.total > 0;
           return (
             <div key={stage.name} className="flex-1 flex flex-col items-center gap-1">
@@ -41,9 +41,8 @@ export default function PipelineBar({ stages }: Props) {
                 <div className={`font-mono text-[12px] ${isDone ? 'text-green-400' : isActive ? 'text-yellow-400' : 'text-zinc-500'}`}>
                   {stage.name}
                 </div>
-                {/* FIX: Show actual progress not all 0/4 */}
-                <div className={`font-mono text-[13px] font-bold ${isDone ? 'text-green-400' : isActive ? 'text-yellow-300' : 'text-zinc-600'}`}>
-                  {stage.completed}/{stage.total}
+                <div className={`font-mono text-[11px] font-bold ${isDone ? 'text-green-500' : isActive ? 'text-yellow-400 animate-pulse' : 'text-zinc-600'}`}>
+                  {isDone ? 'COMPLETED' : isActive ? 'RUNNING' : 'PENDING'}
                 </div>
               </div>
             </div>

@@ -13,6 +13,7 @@ interface SessionMetrics {
 
 interface Props {
   target: string;
+  mode: string;
   ipAddress: string;
   openPorts: number;
   subdomains: number;
@@ -31,6 +32,7 @@ interface Props {
 
 export default function RightPanel({
   target,
+  mode,
   ipAddress,
   openPorts,
   subdomains,
@@ -52,10 +54,10 @@ export default function RightPanel({
       <div className="px-3 py-2 border-b border-zinc-800">
         <div className="text-zinc-500 text-[13px] uppercase tracking-widest mb-1.5">Target Overview</div>
         <div className="space-y-0.5">
-          <Row label="Primary Target" value={target.length > 25 ? target.slice(0, 24) + '…' : target} valueClass="text-green-400" />
+          <Row label="Primary Target" value={target} valueClass="text-green-400" />
           <Row label="IP Address" value={ipAddress || '—'} />
           <Row label="Open Ports" value={openPorts > 0 ? String(openPorts) : '0'} valueClass={openPorts > 0 ? 'text-yellow-400' : 'text-zinc-600'} />
-          <Row label="Subdomains" value={String(subdomains)} valueClass={subdomains > 0 ? 'text-cyan-400' : 'text-zinc-600'} />
+          {mode !== 'PENTEST' && <Row label="Subdomains" value={String(subdomains)} valueClass={subdomains > 0 ? 'text-cyan-400' : 'text-zinc-600'} />}
           <Row label="Technologies" value={String(technologies)} valueClass={technologies > 0 ? 'text-purple-400' : 'text-zinc-600'} />
           <Row label="Attack Surface" value={attackSurface || 'Unknown'} valueClass="text-orange-400" />
         </div>
@@ -149,7 +151,7 @@ function Row({ label, value, valueClass = 'text-zinc-400' }: { label: string; va
   return (
     <div className="flex justify-between items-center gap-1">
       <span className="text-zinc-600 text-[12px]">{label}</span>
-      <span className={`text-[12px] font-bold ${valueClass} truncate max-w-[6rem] text-right`}>{value}</span>
+      <span className={`text-[12px] font-bold ${valueClass} text-right break-all`}>{value}</span>
     </div>
   );
 }

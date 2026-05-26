@@ -15,5 +15,5 @@ node_modules
 .DS_Store
 argus_results
 web-dashboard/node_modules
-web-dashboard/dist
+# web-dashboard/dist (built locally)
 *.log

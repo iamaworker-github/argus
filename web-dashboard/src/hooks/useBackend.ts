@@ -120,8 +120,10 @@ const EMPTY_STATE = {
   commandCount: 0,
   currentThought: null as string | null,
   lastThought: null as string | null,
+  thinkingLines: [] as string[],
   target: '',
   sessionId: '',
+  mode: 'PENTEST',
   riskScore: 0,
   riskLevel: 'Unknown',
   targetIP: '',
@@ -135,6 +137,7 @@ const EMPTY_STATE = {
   riskProfile: 'Balanced',
   maxParallel: '4 agents',
   safeMode: true,
+  agentStatus: 'IDLE',
 };
 
 export function useBackend() {
@@ -198,6 +201,7 @@ export function useBackend() {
               name: s.name,
               completed: s.completed,
               total: s.total,
+              active: s.active,
             }));
 
             // Timeline from logs — full replace to avoid dupes on reconnect
@@ -266,8 +270,10 @@ export function useBackend() {
               commandCount: p.commandsExecuted ?? prev.commandCount,
               currentThought: p.thinkingLines?.length ? p.thinkingLines[p.thinkingLines.length - 1] : null,
               lastThought: prev.currentThought,
+              thinkingLines: p.thinkingLines || [],
               target: p.target || prev.target,
               sessionId: p.sessionId || '',
+              mode: p.mode || prev.mode,
               riskScore: p.riskScore ?? prev.riskScore,
               riskLevel: p.riskLabel || 'Unknown',
               targetIP: p.targetIP || '',
@@ -281,6 +287,7 @@ export function useBackend() {
               riskProfile: p.riskProfile ?? prev.riskProfile,
               maxParallel: p.maxParallel ?? prev.maxParallel,
               safeMode: p.safeMode ?? prev.safeMode,
+              agentStatus: p.agentStatus ?? 'IDLE',
             };
           });
         } catch { /* ignore parse errors */ }

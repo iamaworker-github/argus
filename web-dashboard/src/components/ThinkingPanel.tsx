@@ -5,18 +5,19 @@ interface Props {
   thought: string | null;
   lastThought: string | null;
   tokens: string;
+  thinkingLines?: string[];
 }
 
-export default function ThinkingPanel({ agentName, thought, lastThought, tokens }: Props) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+export default function ThinkingPanel({ agentName, thought, lastThought, tokens, thinkingLines = [] }: Props) {
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   // FIX: Collapse when empty, or show last completed thought
   const isEmpty = !thought;
 
   return (
-    <div className="border-t border-zinc-700 bg-zinc-950 shrink-0">
+    <div className={`${isCollapsed ? 'shrink-0' : 'flex-1'} flex flex-col min-h-0 border-t border-zinc-700 bg-zinc-950`}>
       <div
-        className="flex items-center justify-between px-3 py-1 border-b border-zinc-800 cursor-pointer hover:bg-zinc-900"
+        className="flex items-center justify-between px-3 py-1 border-b border-zinc-800 cursor-pointer hover:bg-zinc-900 shrink-0"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
         <div className="flex items-center gap-2">
@@ -38,17 +39,20 @@ export default function ThinkingPanel({ agentName, thought, lastThought, tokens 
         </div>
       </div>
 
-      {/* FIX: Collapse when empty, show last thought dimmed */}
+      {/* FIX: Show all thinking lines, larger area */}
       {!isCollapsed && (
-        <div className="px-3 py-2 min-h-8 max-h-16 overflow-y-auto">
-          {thought ? (
+        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2">
+          {thinkingLines.length > 0 ? (
+            thinkingLines.map((line, i) => (
+              <p key={i} className="text-zinc-300 font-mono text-[12px] leading-relaxed">{line}</p>
+            ))
+          ) : thought ? (
             <p className="text-zinc-300 font-mono text-[12px] leading-relaxed">{thought}</p>
           ) : lastThought ? (
             <p className="text-zinc-600 font-mono text-[12px] leading-relaxed italic">
               Last: {lastThought}
             </p>
           ) : (
-            // FIX: Don't show big empty "No active thoughts..." — collapse or show minimal indicator
             <p className="text-zinc-700 font-mono text-[12px] italic">—</p>
           )}
           {!isEmpty && (

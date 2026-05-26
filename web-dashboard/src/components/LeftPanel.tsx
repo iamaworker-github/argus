@@ -12,6 +12,7 @@ interface Props {
   riskProfile: string;
   maxParallel: string;
   safeMode: boolean;
+  agentStatus: string;
   onPause: (id: string) => void;
   onResume: (id: string) => void;
   onKill: (id: string) => void;
@@ -44,16 +45,20 @@ function Bar({ value, color }: { value: number; color: string }) {
   );
 }
 
-export default function LeftPanel({ agents, cpu, mem, net, tokens, credits, elapsed, llmModel, riskProfile, maxParallel, safeMode, onPause, onResume, onKill }: Props) {
+export default function LeftPanel({ agents, cpu, mem, net, tokens, credits, elapsed, llmModel, riskProfile, maxParallel, safeMode, agentStatus, onPause, onResume, onKill }: Props) {
   const runningCount = agents.filter(a => a.status === 'Running').length;
   const totalCount = agents.length;
+
+  const statusColor: Record<string, string> = {
+    IDLE: 'text-zinc-500', PLANNING: 'text-yellow-400', EXECUTING: 'text-green-400', ERROR: 'text-red-500',
+  };
 
   return (
     <div className="w-56 shrink-0 border-r border-zinc-700 bg-zinc-950 flex flex-col overflow-y-auto text-xs font-mono">
       {/* Status */}
       <div className="p-2 border-b border-zinc-800">
         <div className="text-zinc-500 uppercase text-[13px] tracking-widest mb-1">Status</div>
-        <div className="text-green-400 font-bold tracking-widest text-[13px]">EXECUTING</div>
+        <div className={`font-bold tracking-widest text-[13px] ${statusColor[agentStatus] || 'text-zinc-500'}`}>{agentStatus}</div>
         <div className="text-zinc-500 mt-1 text-[13px]">MODE</div>
         <div className="text-zinc-300 text-[12px]">PENTEST</div>
       </div>

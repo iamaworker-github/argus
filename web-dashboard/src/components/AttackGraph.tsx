@@ -30,7 +30,7 @@ const typeLegend = [
 ];
 
 export default function AttackGraph({ nodes, edges }: Props) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const W = 100;
   const H = 100;
 

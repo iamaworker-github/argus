@@ -45,6 +45,7 @@ export interface PipelineStage {
   name: string;
   completed: number;
   total: number;
+  active?: boolean;
 }
 
 export interface Toast {

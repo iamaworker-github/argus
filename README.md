@@ -74,8 +74,17 @@ AI Planning ──► Reconnaissance ──► Enumeration ──► Vulnerabili
 
 ## Quick Start
 
+### One-line Install (Linux/macOS)
+
 ```bash
-# Docker (recommended)
+curl -fsSL https://raw.githubusercontent.com/iamaworker-github/argus/main/install.sh | bash
+```
+
+Auto-installs: Python venv, pd-httpx, naabu, nuclei, katana, gau, waybackurls, nmap, web dashboard & all dependencies.
+
+### Docker (recommended)
+
+```bash
 docker pull ghcr.io/iamaworker-github/argus:latest
 
 # Quick scan
@@ -125,6 +134,14 @@ docker build -t argus:latest .
 ```
 
 ## Native Install
+
+### Automatic (install.sh)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/iamaworker-github/argus/main/install.sh | bash
+```
+
+### Manual
 
 ```bash
 git clone https://github.com/iamaworker-github/argus.git

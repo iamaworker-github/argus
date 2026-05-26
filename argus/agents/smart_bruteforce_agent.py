@@ -76,7 +76,6 @@ class SmartBruteforceAgent(BaseAgent):
     def _load_wordlists(self) -> List[str]:
         paths: List[str] = []
 
-        # 1. Default built-in wordlist (398K paths from merged sources)
         default_wl = Path(__file__).parent.parent / "data" / "wordlists" / "default_pentest_wordlist.txt"
         if default_wl.exists():
             try:
@@ -88,31 +87,6 @@ class SmartBruteforceAgent(BaseAgent):
                 logger.info(f"{self.name}: Loaded default wordlist ({len(paths)} paths)")
             except Exception as e:
                 logger.debug(f"{self.name}: Failed to load default wordlist: {e}")
-
-        # 2. Custom wordlist override (mounted by user)
-        custom_paths = [
-            Path("/app/wordlists/onelistforallmicro.txt"),
-            Path("/app/wordlists/custom.txt"),
-            Path("./wordlists/onelistforallmicro.txt"),
-            Path("./wordlists/custom.txt"),
-            Path("/root/.argus/wordlists/onelistforallmicro.txt"),
-        ]
-        for wl_path in custom_paths:
-            if wl_path.exists():
-                try:
-                    content = wl_path.read_text(encoding="utf-8", errors="ignore")
-                    count = 0
-                    for line in content.split("\n"):
-                        line = line.strip()
-                        if line and not line.startswith("#"):
-                            p = line if line.startswith("/") else "/" + line
-                            if p not in paths:
-                                paths.append(p)
-                                count += 1
-                    logger.info(f"{self.name}: Added {count} custom paths from {wl_path}")
-                except Exception as e:
-                    logger.debug(f"{self.name}: Failed to load {wl_path}: {e}")
-                break
 
         return paths
 

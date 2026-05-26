@@ -3,15 +3,7 @@
 # Multi-stage Docker build
 # =============================================================================
 
-# ---- Stage 1: Frontend build ----
-FROM node:22-alpine AS frontend-builder
-WORKDIR /app
-COPY web-dashboard/package.json web-dashboard/package-lock.json ./
-RUN npm ci
-COPY web-dashboard/ ./
-RUN npm run build
-
-# ---- Stage 2: Python + Tools ----
+# ---- Stage 1: Python + Tools ----
 FROM ubuntu:24.04
 
 LABEL org.opencontainers.image.title="Argus"
@@ -56,6 +48,7 @@ RUN go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest
 RUN go install -v github.com/lc/gau/v2/cmd/gau@latest
 RUN go install -v github.com/tomnomnom/waybackurls@latest
 RUN go install -v github.com/projectdiscovery/katana/cmd/katana@latest
+RUN go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
 
 # Nuclei templates
 RUN nuclei -update-templates 2>/dev/null || true
@@ -73,9 +66,10 @@ COPY README.md .
 RUN pip3 install --no-cache-dir -e ".[web]"
 
 # ---- Frontend assets ----
-COPY --from=frontend-builder /app/dist /app/web-dashboard/dist
+COPY web-dashboard/dist /app/web-dashboard/dist
 
 # Entry point
 EXPOSE 8484
 ENTRYPOINT ["argus"]
 CMD ["web", "--host", "0.0.0.0", "--port", "8484"]
+

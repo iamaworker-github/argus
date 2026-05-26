@@ -12,6 +12,14 @@ import RightPanel from './components/RightPanel';
 import BottomBar from './components/BottomBar';
 import ToastNotification from './components/ToastNotification';
 
+const AGENT_DISPLAY_NAMES: Record<string, string> = {
+  'Plan Agent': 'AI Planning Agent',
+};
+
+function getAgentDisplayName(name: string): string {
+  return AGENT_DISPLAY_NAMES[name] || name;
+}
+
 export default function App() {
   const sim = useBackend();
   const [filterAgent, setFilterAgent] = useState('all');
@@ -51,11 +59,12 @@ export default function App() {
     URL.revokeObjectURL(url);
   }, [sim.target, sim.sessionId, sim.findings, sim.pipelineStages]);
 
-  const handleCommand = useCallback((_cmd: string) => {
-    // Future: send command via WebSocket
-  }, []);
+  const handleCommand = useCallback((cmd: string) => {
+    sim.requestScan(cmd, 'pentest');
+  }, [sim]);
 
-  const currentAgent = sim.agents.find((a) => a.status === 'Running') || sim.agents[0];
+  const currentAgent = sim.agents.find((a) => a.status === 'Running') || null;
+  const agentDisplayName = currentAgent ? getAgentDisplayName(currentAgent.name) : null;
 
   const sessionMetrics = {
     commandsExecuted: sim.commandCount,
@@ -94,6 +103,7 @@ export default function App() {
           riskProfile={sim.riskProfile}
           maxParallel={sim.maxParallel}
           safeMode={sim.safeMode}
+          agentStatus={sim.agentStatus}
           onPause={handlePause}
           onResume={handleResume}
           onKill={handleKill}
@@ -106,8 +116,8 @@ export default function App() {
             <div className="flex-1 min-h-0 overflow-hidden">
               <UnifiedTimeline
                 events={sim.timeline}
-                agentName={currentAgent?.name || 'RECON AGENT'}
-                agentStatus={currentAgent?.status || 'Running'}
+                agentName={agentDisplayName || (sim.agentStatus === 'IDLE' ? 'System' : sim.agentStatus)}
+                agentStatus={currentAgent?.status || (sim.agentStatus === 'IDLE' ? 'Idle' : 'Running')}
                 elapsed={sim.elapsed}
                 filterAgent={filterAgent}
                 filterSeverity={filterSeverity}
@@ -118,16 +128,18 @@ export default function App() {
             </div>
 
             <ThinkingPanel
-              agentName={currentAgent?.name || 'RECON AGENT'}
+              agentName={agentDisplayName || (sim.agentStatus === 'IDLE' ? 'System' : sim.agentStatus)}
               thought={sim.currentThought}
               lastThought={sim.lastThought}
+              thinkingLines={sim.thinkingLines}
               tokens={`${(sim.tokens / 1000).toFixed(1)}M`}
             />
           </div>
-        </div>
+          </div>
 
         <RightPanel
           target={sim.target}
+          mode={sim.mode}
           ipAddress={sim.targetIP}
           openPorts={sim.openPorts}
           subdomains={sim.subdomains}
@@ -145,7 +157,7 @@ export default function App() {
         />
       </div>
 
-      <BottomBar onCommand={handleCommand} />
+      <BottomBar onCommand={handleCommand} shortcuts={['? Help', 'Tab Complete', 'Ctrl+K Commands', 'Ctrl+D Exit']} />
     </div>
   );
 }

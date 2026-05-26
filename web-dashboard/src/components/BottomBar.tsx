@@ -2,9 +2,10 @@ import { useState } from 'react';
 
 interface Props {
   onCommand: (cmd: string) => void;
+  shortcuts?: string[];
 }
 
-export default function BottomBar({ onCommand }: Props) {
+export default function BottomBar({ onCommand, shortcuts = [] }: Props) {
   const [input, setInput] = useState('');
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -30,10 +31,9 @@ export default function BottomBar({ onCommand }: Props) {
       </div>
       {/* Right: action buttons */}
       <div className="flex items-center gap-1 px-2 py-1.5 border-l border-zinc-700">
-        <Btn label="? Help" />
-        <Btn label="Tab Complete" />
-        <Btn label="Ctrl+K Commands" />
-        <Btn label="Ctrl+D Exit" />
+        {shortcuts.map((label) => (
+          <Btn key={label} label={label} />
+        ))}
       </div>
     </div>
   );

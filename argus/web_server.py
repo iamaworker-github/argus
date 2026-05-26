@@ -25,6 +25,15 @@ from argus.agents.orchestrator import AgentOrchestrator
 
 logger = get_logger()
 
+
+def _append_log(logs: list, entry: dict) -> list:
+    """Append log entry only if different from last, to avoid duplicates."""
+    if logs and logs[-1].get("text") == entry.get("text") and logs[-1].get("agent_name") == entry.get("agent_name"):
+        return logs
+    logs.append(entry)
+    return logs
+
+
 # Current orchestrator reference for pause/kill
 _current_orchestrator: Optional['AgentOrchestrator'] = None
 
@@ -65,10 +74,11 @@ class DashboardState:
             "knowledgeBase": "Idle",
             "agents": [],
             "pipeline": [
-                {"name": "Reconnaissance", "completed": 0, "total": 4, "active": False},
-                {"name": "Enumeration", "completed": 0, "total": 4, "active": False},
-                {"name": "Analysis", "completed": 0, "total": 3, "active": False},
+                {"name": "AI Planning", "completed": 0, "total": 1, "active": False},
+                {"name": "Reconnaissance", "completed": 0, "total": 5, "active": False},
+                {"name": "Enumeration", "completed": 0, "total": 3, "active": False},
                 {"name": "Vulnerability", "completed": 0, "total": 4, "active": False},
+                {"name": "AI Analysis", "completed": 0, "total": 2, "active": False},
                 {"name": "Exploitation", "completed": 0, "total": 2, "active": False},
                 {"name": "Reporting", "completed": 0, "total": 2, "active": False},
             ],
@@ -135,7 +145,7 @@ def setup_event_subscriptions():
                 "findings": 0,
             })
         logs = dashboard_state.state.get("logs", [])
-        logs.append({"text": f"Agent started: {event.agent_name}", "type": "info", "timestamp": now, "agent_name": event.agent_name})
+        logs = _append_log(logs, {"text": f"Agent started: {event.agent_name}", "type": "info", "timestamp": now, "agent_name": event.agent_name})
         activities = dashboard_state.state.get("activities", [])
         activities.append({"time": now, "agent": event.agent_name, "message": "Agent started"})
         dashboard_state.update({
@@ -157,7 +167,7 @@ def setup_event_subscriptions():
                 a["status"] = "completed"
                 a["progress"] = 100
         logs = dashboard_state.state.get("logs", [])
-        logs.append({"text": f"Agent completed: {event.agent_name} ({event.findings_count} findings)", "type": "success", "timestamp": now, "agent_name": event.agent_name})
+        logs = _append_log(logs, {"text": f"Agent completed: {event.agent_name} ({event.findings_count} findings)", "type": "success", "timestamp": now, "agent_name": event.agent_name})
         activities = dashboard_state.state.get("activities", [])
         activities.append({"time": now, "agent": event.agent_name, "message": f"Agent completed — {event.findings_count} findings"})
         dashboard_state.update({
@@ -176,7 +186,7 @@ def setup_event_subscriptions():
             if a["name"] == event.agent_name:
                 a["status"] = "error"
         logs = dashboard_state.state.get("logs", [])
-        logs.append({"text": f"Agent failed: {event.agent_name} — {event.error_message}", "type": "error", "timestamp": now, "agent_name": event.agent_name})
+        logs = _append_log(logs, {"text": f"Agent failed: {event.agent_name} — {event.error_message}", "type": "error", "timestamp": now, "agent_name": event.agent_name})
         activities = dashboard_state.state.get("activities", [])
         activities.append({"time": now, "agent": event.agent_name, "message": f"Agent failed: {event.error_message}"})
         dashboard_state.update({
@@ -193,7 +203,7 @@ def setup_event_subscriptions():
         lines = lines[-9:] + [f"> {event.thought}"]
         now = datetime.now().strftime("%H:%M:%S")
         logs = dashboard_state.state.get("logs", [])
-        logs.append({"text": f"[{event.agent_name}] {event.thought}", "type": "thinking", "timestamp": now, "agent_name": event.agent_name})
+        logs = _append_log(logs, {"text": f"[{event.agent_name}] {event.thought}", "type": "thinking", "timestamp": now, "agent_name": event.agent_name})
         dashboard_state.update({
             "thinkingLines": lines,
             "logs": logs[-50:],
@@ -223,12 +233,38 @@ def setup_event_subscriptions():
             if a["name"] == event.agent_name:
                 a["findings"] = a.get("findings", 0) + 1
         logs = dashboard_state.state.get("logs", [])
-        logs.append({"text": f"Finding: {event.title} [{event.severity.upper()}]", "type": "warning", "timestamp": now, "agent_name": event.agent_name})
+        logs = _append_log(logs, {"text": f"Finding: {event.title} [{event.severity.upper()}]", "type": "warning", "timestamp": now, "agent_name": event.agent_name})
+
+        # Extract technologies from findings (Recon Agent batch or httpx inline)
+        tech_update = {}
+        existing_techs = dashboard_state.state.get("technologies", [])
+        existing_names = {t.get("name") if isinstance(t, dict) else t for t in existing_techs}
+        new_techs = []
+        if event.agent_name == "Recon Agent" and "technologies" in event.title.lower():
+            if event.evidence and event.evidence.startswith("Technologies:"):
+                raw = event.evidence.replace("Technologies:", "").strip()
+                tech_list = [t.strip() for t in raw.split(",") if t.strip()]
+                for t in tech_list:
+                    if t not in existing_names:
+                        new_techs.append({"name": t, "icon": "", "percent": 100})
+                        existing_names.add(t)
+        elif event.agent_name == "httpx" and event.title.startswith("Technology: "):
+            tech_name = event.title.replace("Technology: ", "").strip()
+            if tech_name and tech_name not in existing_names:
+                new_techs.append({"name": tech_name, "icon": "", "percent": 100})
+                existing_names.add(tech_name)
+        if new_techs:
+            tech_update = {
+                "technologies": existing_techs + new_techs,
+                "technologies_count": len(existing_techs) + len(new_techs),
+            }
+
         dashboard_state.update({
             "findings": findings,
             "findingsCount": findings_count,
             "agents": agents,
             "logs": logs[-50:],
+            **tech_update,
         })
         await broadcast_state()
 
@@ -241,12 +277,79 @@ def setup_event_subscriptions():
                 a["progress"] = max(a.get("progress", 0), int(event.progress))
         logs = dashboard_state.state.get("logs", [])
         if event.message:
-            logs.append({"text": f"[{event.agent_name}] {event.message}", "type": "info", "timestamp": now, "agent_name": event.agent_name})
+            logs = _append_log(logs, {"text": f"[{event.agent_name}] {event.message}", "type": "info", "timestamp": now, "agent_name": event.agent_name})
+        # Extract target IP from recon messages
+        if event.message and "Target IP:" in event.message:
+            import re as _re
+            m = _re.search(r'Target IP:\s*([\d.]+)', event.message)
+            if m:
+                dashboard_state.update({"targetIP": m.group(1)})
+        # Extract open ports from messages
+        if event.message and "open ports:" in event.message.lower():
+            import re as _re
+            m = _re.search(r'open ports:\s*(\d+)', event.message, _re.I)
+            if m:
+                dashboard_state.update({"openPorts": int(m.group(1))})
+        # Update pipeline stage from current_phase
+        pipeline = list(dashboard_state.state.get("pipeline", []))
+        phase_to_stage = {
+            "planning": 0, "reconnaissance": 1, "enumeration": 2,
+            "vulnerability": 3, "ai_analysis": 4, "exploitation": 5, "reporting": 6,
+        }
+        phase_agent_names = {
+            "planning": "Plan Agent", "reconnaissance": "Recon Agent",
+            "enumeration": "BackMeUp", "vulnerability": "Vuln Scanner",
+            "ai_analysis": "Analysis Agent", "exploitation": "Exploitation Agent",
+            "reporting": "Report Agent",
+        }
+        if event.current_phase == "completed":
+            for s in pipeline:
+                s["active"] = False
+                s["completed"] = s["total"]
+        elif event.current_phase in phase_to_stage:
+            ix = phase_to_stage[event.current_phase]
+            for i, s in enumerate(pipeline):
+                was_active = s.get("active", False)
+                is_current = i == ix
+                if is_current and not was_active:
+                    pipeline[i]["active"] = True
+                elif not is_current and was_active and i < ix:
+                    pipeline[i]["active"] = False
+                    pipeline[i]["completed"] = pipeline[i]["total"]
+            # Add phase agent to agents list if not already there
+            agent_name = phase_agent_names.get(event.current_phase)
+            if agent_name and not any(a.get("name") == agent_name for a in agents):
+                agents.append({
+                    "name": agent_name,
+                    "id": agent_name.lower().replace(" ", "_"),
+                    "status": "running" if pipeline[ix].get("active") else "idle",
+                    "progress": int(event.progress),
+                    "findings": 0,
+                })
+        # Update agent status based on pipeline
+        for a in agents:
+            a_name = a.get("name", "")
+            a_phase = None
+            for p_name, p_agent in phase_agent_names.items():
+                if p_agent == a_name:
+                    a_phase = p_name
+                    break
+            if a_phase and a_phase in phase_to_stage:
+                ix = phase_to_stage[a_phase]
+                s = pipeline[ix] if ix < len(pipeline) else None
+                if s:
+                    if s.get("completed") == s.get("total") and s.get("total", 0) > 0:
+                        a["status"] = "completed"
+                    elif s.get("active"):
+                        a["status"] = "running"
+                    else:
+                        a["status"] = "idle"
         dashboard_state.update({
             "commandsExecuted": dashboard_state.state.get("commandsExecuted", 0) + 1,
             "dataCollected": f"{float(dashboard_state.state.get('dataCollected', '0').split()[0]) + 0.1:.1f} MB",
             "agents": agents,
             "logs": logs[-50:],
+            "pipeline": pipeline,
         })
         await broadcast_state()
 
@@ -337,6 +440,9 @@ async def startup():
     if _pending_scan:
         ps = _pending_scan
         _pending_scan = None
+        import re as _re
+        target_ip = ps["target"] if _re.match(r'^\d+\.\d+\.\d+\.\d+$', ps["target"]) else ""
+        dashboard_state.update({"targetIP": target_ip})
         await asyncio.sleep(1)
         await broadcast_state()
         asyncio.create_task(_run_scan_task(ps["target"], ps["mode"], ps["session_id"]))
@@ -350,11 +456,14 @@ async def get_state():
 @app.post("/api/scan")
 async def start_scan(req: ScanRequest):
     session_id = uuid.uuid4().hex[:8]
+    import re as _re
+    target_ip = req.target if _re.match(r'^\d+\.\d+\.\d+\.\d+$', req.target) else ""
     dashboard_state.update({
         "target": req.target,
         "mode": req.mode.upper(),
         "sessionId": session_id,
         "agentStatus": "PLANNING",
+        "targetIP": target_ip,
         "commandsExecuted": 0,
         "dataCollected": "0 MB",
         "findingsCount": 0,
@@ -424,7 +533,7 @@ async def _run_scan_task(target: str, mode: str, session_id: str):
         activities = []
         for ar in agent_results:
             agent_name = getattr(ar, "agent_name", "unknown")
-            logs.append({"text": f"Agent {agent_name} completed — {len(getattr(ar, 'findings', []))} findings", "type": "info", "agent_name": agent_name})
+            logs = _append_log(logs, {"text": f"Agent {agent_name} completed — {len(getattr(ar, 'findings', []))} findings", "type": "info", "agent_name": agent_name})
             activities.append({"time": datetime.now().strftime("%H:%M:%S"), "agent": agent_name, "message": f"Agent completed with {len(getattr(ar, 'findings', []))} findings"})
 
             for f in getattr(ar, "findings", []):
