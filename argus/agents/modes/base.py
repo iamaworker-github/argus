@@ -18,8 +18,6 @@ from argus.core.todo_manager import get_todo_manager, TodoStatus, TodoPriority
 from argus.core import MEMORY_SYSTEM_AVAILABLE
 if MEMORY_SYSTEM_AVAILABLE:
     from argus.core.memory_manager import MemoryManager
-if MEMORY_SYSTEM_AVAILABLE:
-    from argus.core.memory_manager import MemoryManager
 
 logger = get_logger()
 config = get_config()

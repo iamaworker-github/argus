@@ -131,12 +131,18 @@ class PoCValidatorAgent(BaseAgent):
             finding.validation_status = "unvalidated_poc_missing"
             return finding.validation_status
 
-        # Rule 3: PoC must be executable Python
+        # Rule 3: Try curl reproduction for findings with URLs in evidence
+        curl_valid = await self._validate_via_curl(finding)
+        if curl_valid is False:
+            finding.validation_status = "rejected_curl_reproduction_failed"
+            return finding.validation_status
+
+        # Rule 4: PoC must be executable Python
         if not self._is_executable_python(poc):
             finding.validation_status = "rejected_poc_non_executable"
             return finding.validation_status
 
-        # Rules 4-5: Execute PoC in sandbox
+        # Rules 5-6: Execute PoC in sandbox
         validation_start = asyncio.get_event_loop().time()
         execution = await self.python.execute_exploit(poc, self.target)
 
@@ -173,6 +179,53 @@ class PoCValidatorAgent(BaseAgent):
         if not previous or previous.validation_status != "validated" or not previous.last_validated:
             return False
         return previous.last_validated.date() == datetime.now().date()
+
+    async def _validate_via_curl(self, finding: Finding) -> Optional[bool]:
+        """Independent curl reproduction: replay finding's URL and check if
+        the vulnerability pattern is still present. Returns:
+          - True  → curl confirms vulnerability still present
+          - False → curl could not reproduce (likely false positive)
+          - None  → skipped (no URL in evidence, or non-HTTP finding)
+        """
+        import re as _re
+        evidence = (finding.evidence or "").strip()
+        poc = (finding.proof_of_concept or "").strip()
+        severity = finding.severity.lower()
+
+        url_match = _re.search(r"https?://[^\s'\"]+", evidence)
+        if not url_match:
+            url_match = _re.search(r"https?://[^\s'\"]+", poc)
+        if not url_match:
+            return None
+
+        target_url = url_match.group(0)
+        if not target_url.startswith("http"):
+            return None
+
+        try:
+            header_args = self.format_auth_args()
+            cmd = ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "--max-time", "10"]
+            cmd.extend(header_args)
+            cmd.append(target_url)
+            proc = await asyncio.create_subprocess_exec(
+                *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
+            http_code = stdout.decode().strip()
+            code_int = int(http_code) if http_code.isdigit() else 0
+
+            if severity in ("critical", "high") and code_int in (0, 403, 404, 410, 503):
+                logger.info(f"  ⚠ Curl reproduction FAILED for '{finding.title}' (HTTP {http_code})")
+                return False
+
+            if severity in ("critical", "high") and code_int in (200, 401, 302, 500):
+                logger.info(f"  ✅ Curl reproduction OK for '{finding.title}' (HTTP {http_code})")
+                return True
+
+            return None
+        except Exception as exc:
+            logger.debug(f"Curl validation error for '{finding.title}': {exc}")
+            return None
 
     @staticmethod
     def _is_executable_python(poc: str) -> bool:

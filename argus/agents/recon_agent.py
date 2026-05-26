@@ -3,6 +3,7 @@ Reconnaissance agent for information gathering
 """
 
 
+import asyncio
 from typing import List, Dict, Any
 import httpx
 import dns.resolver
@@ -22,9 +23,23 @@ class ReconAgent(BaseAgent):
         self.technologies: List[str] = []
         self.mode = mode  # Store mode for blackbox testing
 
+    async def _emit_thought(self, thought: str, thought_type: str = "reasoning", phase: str = "") -> None:
+        if self.event_bus:
+            try:
+                from argus.core.events import AgentThinkingEvent
+                await self.event_bus.publish_event(AgentThinkingEvent(
+                    agent_name=self.name,
+                    thought=thought,
+                    thought_type=thought_type,
+                    phase=phase or "",
+                ))
+            except Exception:
+                pass
+
     async def execute(self) -> AgentResult:
         """Execute reconnaissance"""
         logger.info(f"{self.name}: Gathering intelligence on {self.target}")
+        await self._emit_thought(f"Starting reconnaissance on {self.target}...", "analyzing", "recon")
 
         # Skip subdomain enumeration in pentest mode (blackbox only)
         if self.mode != "pentest":
@@ -52,6 +67,7 @@ class ReconAgent(BaseAgent):
 
     async def _dns_enumeration(self) -> None:
         """Perform DNS enumeration"""
+        await self._emit_thought("Enumerating DNS records and subdomains...", "recon", "dns")
         try:
             resolver = dns.resolver.Resolver()
             resolver.timeout = 5
@@ -87,47 +103,40 @@ class ReconAgent(BaseAgent):
             logger.debug(f"DNS enumeration error: {e}")
 
     async def _detect_technologies(self) -> None:
-        """Detect web technologies"""
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            try:
-                response = await client.get(f"http://{self.target}")
+        """Detect web technologies using httpx -td"""
+        import json as _json
+        await self._emit_thought(f"Detecting web technologies on {self.target} with httpx -td...", "recon", "tech_detection")
+        try:
+            domain = self.target.split('/')[0].split(':')[0]
+            httpx_cmd = ["pd-httpx", "-u", domain, "-td", "-json", "-sc", "-silent"]
+            httpx_cmd.extend(self.format_auth_args())
+            proc = await asyncio.create_subprocess_exec(
+                *httpx_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=20)
+            for line in stdout.decode().strip().split('\n'):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = _json.loads(line)
+                    techs = data.get("tech", []) or []
+                    if techs:
+                        self.technologies.extend(techs)
+                except Exception:
+                    pass
 
-                # Check headers for technology indicators
-                headers = response.headers
-
-                if "X-Powered-By" in headers:
-                    self.technologies.append(headers["X-Powered-By"])
-
-                if "Server" in headers:
-                    self.technologies.append(headers["Server"])
-
-                # Check HTML for frameworks
-                html = response.text.lower()
-                frameworks = {
-                    "react": "react",
-                    "vue": "vue.js",
-                    "angular": "angular",
-                    "wordpress": "wordpress",
-                    "drupal": "drupal",
-                    "joomla": "joomla",
-                }
-
-                for keyword, framework in frameworks.items():
-                    if keyword in html:
-                        self.technologies.append(framework)
-
-                if self.technologies:
-                    self.add_finding(Finding(
-                        title="Technologies detected",
-                        description=f"Identified {len(self.technologies)} technologies",
-                        severity="info",
-                        category="recon",
-                        evidence=f"Technologies: {', '.join(set(self.technologies))}",
-                        confidence=0.8,
-                    ))
-
-            except Exception as e:
-                logger.debug(f"Technology detection error: {e}")
+            if self.technologies:
+                self.add_finding(Finding(
+                    title="Technologies detected",
+                    description=f"Identified {len(self.technologies)} technologies via httpx -td",
+                    severity="info",
+                    category="recon",
+                    evidence=f"Technologies: {', '.join(set(self.technologies))}",
+                    confidence=0.9,
+                ))
+        except Exception as e:
+            logger.debug(f"httpx -td technology detection error: {e}")
 
     async def _discover_endpoints(self) -> None:
         """Discover endpoints using default wordlist"""
@@ -158,7 +167,7 @@ class ReconAgent(BaseAgent):
         sensitive_paths = ["/.git", "/.env", "/backup", "/.git/config", "/config.php",
                           "/wp-config.php", "/.aws", "/.ssh", "/id_rsa"]
 
-        async with httpx.AsyncClient(timeout=5.0, follow_redirects=False) as client:
+        async with httpx.AsyncClient(timeout=5.0, follow_redirects=False, headers=self.get_http_client_headers()) as client:
             for path in paths_to_test:
                 try:
                     url = f"http://{self.target}{path}"

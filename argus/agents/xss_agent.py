@@ -3,7 +3,7 @@ XSS (Cross-Site Scripting) detection agent
 """
 
 import asyncio
-from typing import List
+from typing import List, Optional
 import httpx
 from argus.agents.base_agent import BaseAgent, AgentResult, Finding, AgentStatus
 from argus.core.logger import get_logger
@@ -39,6 +39,8 @@ class XSSAgent(BaseAgent):
         # Test DOM-based XSS (requires browser)
         if self.browser:
             await self._test_dom_xss()
+
+        await self._run_nuclei_tags(tags=["xss", "reflected-xss", "stored-xss"], severity="high")
 
         return AgentResult(
             agent_name=self.name,

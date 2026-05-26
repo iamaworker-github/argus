@@ -3,6 +3,7 @@ ArgusSkillLearner — Self-improving skill system.
 Automatically generates new skills from successful findings.
 Hermes-inspired: skills get better the more they're used.
 """
+import asyncio
 import json
 import re
 import os
@@ -128,6 +129,75 @@ class SkillLearner:
         name = name[:80]
         slug = f"learned-{name}"
         return slug
+
+    async def learn_from_h1_disclosures(self, max_reports: int = 20) -> int:
+        """Fetch latest HackerOne disclosed reports from HuggingFace dataset,
+        extract vulnerability patterns and auto-generate new skills.
+
+        Uses curl to fetch the HuggingFace dataset viewer API for
+        'trufflesecurity/hackerone_vulnerability_reports'.
+        Returns the number of new skills generated.
+        """
+        hf_api = "https://huggingface.co/api/datasets/trufflesecurity/hackerone_vulnerability_reports/parquet/default/train"
+        count = 0
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "curl", "-s", "-L", "-H", "Accept: application/json",
+                f"{hf_api}?rows={max_reports}",
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            )
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
+            data = json.loads(stdout.decode())
+
+            rows = []
+            if isinstance(data, dict):
+                rows = data.get("rows", [])
+            elif isinstance(data, list):
+                rows = data[:max_reports]
+
+            for row in rows:
+                try:
+                    if isinstance(row, dict) and "row" in row:
+                        row = row["row"]
+                    title = row.get("title", "") or row.get("vulnerability_information", "") or ""
+                    weakness = row.get("weakness", {}).get("name", "") if isinstance(row.get("weakness"), dict) else ""
+                    severity = row.get("severity", "high")
+                    remediation = row.get("remediation", "") or ""
+                    payload = row.get("payload", "") or row.get("proof_of_concept", "") or ""
+
+                    if not title:
+                        continue
+                    if severity not in ("critical", "high", "medium"):
+                        continue
+
+                    name = self._slugify(f"h1-{title[:60]}")
+                    if name in self._learned_names:
+                        continue
+
+                    tags = f'"h1-disclosure", "{weakness or 'general'}", "{severity}"'
+                    content = TEMPLATE.format(
+                        name=name,
+                        description=f"H1 disclosure skill: {title[:200]}",
+                        category=weakness or "general",
+                        tags=tags,
+                        technique=f"Vulnerability type: {weakness}\nTitle: {title[:500]}",
+                        payload=payload[:300] or "See H1 disclosure for PoC",
+                        remediation=remediation[:300] or "Refer to HackerOne disclosed report",
+                    )
+
+                    filepath = SKILLS_LEARNED_DIR / f"{name}.md"
+                    filepath.write_text(content)
+                    self._learned_names.add(name)
+                    count += 1
+                    logger.info(f"📚 Learned skill from H1 disclosure: {name}")
+                except Exception as exc:
+                    logger.debug(f"Failed to process H1 report: {exc}")
+                    continue
+        except Exception as exc:
+            logger.warning(f"H1 disclosure fetch failed: {exc}")
+
+        logger.info(f"H1 skill generator: generated {count} new skills from {max_reports} disclosures")
+        return count
 
     def get_all_learned(self) -> List[Dict]:
         results = []

@@ -44,6 +44,8 @@ class SQLInjectionAgent(BaseAgent):
         # Test headers
         await self._test_headers()
 
+        await self._run_nuclei_tags(tags=["sql-injection", "sqli", "error-sql"], severity="high")
+
         return AgentResult(
             agent_name=self.name,
             status=self.status,

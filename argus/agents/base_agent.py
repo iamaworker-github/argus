@@ -145,6 +145,10 @@ class BaseAgent(ABC):
         # Cross-agent baton context (set by orchestrator in sequential mode)
         self.context: Dict[str, Any] = {}
 
+        # Auth headers/cookies for authenticated scanning (set by orchestrator)
+        self.auth_headers: Dict[str, str] = {}
+        self.auth_cookies: Dict[str, str] = {}
+
         # Blackboard for inter-agent context sharing
         self._blackboard: Blackboard = get_blackboard()
         self._learning_engine = get_learning_engine()
@@ -194,6 +198,27 @@ class BaseAgent(ABC):
             logger.debug(f"{self.name}: Paused, waiting for resume...")
             await self._paused_event.wait()
             logger.debug(f"{self.name}: Resumed")
+
+    def format_auth_args(self) -> List[str]:
+        """Format auth headers as CLI args for subprocess tools (httpx, nuclei, etc.)."""
+        args: List[str] = []
+        for key, value in self.auth_headers.items():
+            args.extend(["-H", f"{key}: {value}"])
+        if self.auth_cookies:
+            cookie_str = "; ".join(f"{k}={v}" for k, v in self.auth_cookies.items())
+            args.extend(["-H", f"Cookie: {cookie_str}"])
+        return args
+
+    def get_http_client_headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        """Get dict of headers including auth, for use with httpx.AsyncClient."""
+        headers = dict(self.auth_headers)
+        if self.auth_cookies:
+            cookie_str = "; ".join(f"{k}={v}" for k, v in self.auth_cookies.items())
+            headers["Cookie"] = cookie_str
+        if extra:
+            headers.update(extra)
+        headers.setdefault("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        return headers
 
     def set_shared_browser(self, browser: BrowserAutomation) -> None:
         """Set shared browser instance (Strix v0.6.2 style)."""
@@ -661,3 +686,86 @@ class BaseAgent(ABC):
     def get_findings(self) -> List[Finding]:
         """Get all findings"""
         return self.findings.copy()
+
+    async def _run_nuclei_tags(self, tags: List[str], severity: str = "info") -> None:
+        """Run nuclei with specific tags relevant to this agent.
+
+        Each agent calls this with vulnerability-specific nuclei tags
+        so only relevant templates run (not all 1000s of nuclei templates).
+        """
+        try:
+            import subprocess
+            from pathlib import Path
+            import json
+
+            result = subprocess.run(["which", "nuclei"], capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.debug("nuclei not available for tag scan")
+                return
+
+            urls = self.get_test_urls()
+            if not urls:
+                return
+
+            urls_file = f"/tmp/nuclei_urls_{self.name.lower().replace(' ', '_')}.txt"
+            output_file = f"/tmp/nuclei_results_{self.name.lower().replace(' ', '_')}.jsonl"
+
+            with open(urls_file, "w") as f:
+                for url in urls[:50]:
+                    f.write(url + "\n")
+
+            tag_str = ",".join(tags)
+            cmd = [
+                "nuclei", "-l", urls_file,
+                "-tags", tag_str,
+                "-jsonl", "-o", output_file,
+                "-silent", "-timeout", "8",
+                "-severity", severity,
+            ]
+            logger.info(f"{self.name}: Running nuclei with tags: {tag_str}")
+
+            proc = await asyncio.create_subprocess_exec(
+                *cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+            try:
+                await asyncio.wait_for(proc.communicate(), timeout=90)
+            except asyncio.TimeoutError:
+                proc.kill()
+
+            if Path(output_file).exists() and Path(output_file).stat().st_size > 0:
+                with open(output_file) as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            entry = json.loads(line)
+                            self._add_finding_from_nuclei_entry(entry)
+                        except json.JSONDecodeError:
+                            continue
+                Path(output_file).unlink(missing_ok=True)
+
+            Path(urls_file).unlink(missing_ok=True)
+
+        except Exception as e:
+            logger.debug(f"{self.name}: nuclei tag scan failed: {e}")
+
+    def _add_finding_from_nuclei_entry(self, entry: dict) -> None:
+        severity_map = {"critical": "critical", "high": "high", "medium": "medium", "low": "low", "info": "info"}
+        sev = severity_map.get(entry.get("info", {}).get("severity", "").lower(), "info")
+        name = entry.get("info", {}).get("name", entry.get("template-id", "unknown"))
+        matched = entry.get("matched-at", entry.get("host", self.target))
+        extract = entry.get("extracted-results", [])
+        ext_str = ", ".join(extract[:3]) if extract else ""
+        desc = entry.get("info", {}).get("description", "")
+        template_id = entry.get("template-id", "")
+        cve = ""
+        if "classification" in entry.get("info", {}):
+            cve = ", ".join(entry["info"]["classification"].get("cve-id", []))
+        self.add_finding(Finding(
+            title=f"[Nuclei:{self.name}] {name}" + (f" ({cve})" if cve else ""),
+            description=desc or f"Nuclei template {template_id} matched on {matched}",
+            severity=sev, category="nuclei",
+            evidence=f"URL: {matched}\nExtracted: {ext_str}\nTemplate: {template_id}",
+            confidence=0.85,
+        ))

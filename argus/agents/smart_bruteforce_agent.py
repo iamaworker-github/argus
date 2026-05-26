@@ -7,7 +7,6 @@ import httpx
 from pathlib import Path
 from urllib.parse import urlparse
 from typing import Optional, List, Dict, Any, Set
-from collections import OrderedDict
 
 from argus.agents.base_agent import BaseAgent, AgentResult, Finding, AgentStatus
 from argus.core.logger import get_logger
@@ -56,7 +55,7 @@ class SmartBruteforceAgent(BaseAgent):
         scan_paths = wordlist[:5000] if len(wordlist) > 5000 else wordlist
         logger.info(f"{self.name}: Scanning {len(scan_paths)} paths across {len(targets_to_scan)} targets")
 
-        async with httpx.AsyncClient(timeout=8, follow_redirects=False) as client:
+        async with httpx.AsyncClient(timeout=8, follow_redirects=False, headers=self.get_http_client_headers()) as client:
             for base_url in targets_to_scan:
                 if self.should_stop:
                     logger.info(f"{self.name}: Cancelled during bruteforce")
@@ -145,7 +144,7 @@ class SmartBruteforceAgent(BaseAgent):
         return sorted_paths
 
     async def _bruteforce(self, client: httpx.AsyncClient, base_url: str, wordlist: List[str]) -> None:
-        header = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        header = self.get_http_client_headers({"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
         for path in wordlist:
             if self.should_stop:
                 logger.info(f"{self.name}: Cancelled mid-bruteforce")

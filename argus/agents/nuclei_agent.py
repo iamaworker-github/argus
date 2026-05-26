@@ -112,34 +112,34 @@ Return ONLY a JSON list: ["template1", "template2", "template3"]"""
                 for url in self.urls[:200]:
                     f.write(url + "\n")
 
+            cmd = ["nuclei", "-l", urls_file, "-jsonl", "-o", output_file,
+                   "-stats", "-silent", "-timeout", "10"]
+            cmd.extend(self.format_auth_args())
             for template in self.selected_templates:
+                cmd.extend(["-t", template])
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    *cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                )
                 try:
-                    cmd = ["nuclei", "-l", urls_file, "-t", template, "-jsonl", "-o", output_file,
-                           "-stats", "-silent", "-timeout", "10"]
-                    proc = await asyncio.create_subprocess_exec(
-                        *cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-                    )
-                    try:
-                        await asyncio.wait_for(proc.communicate(), timeout=120)
-                    except asyncio.TimeoutError:
-                        proc.kill()
+                    await asyncio.wait_for(proc.communicate(), timeout=180)
+                except asyncio.TimeoutError:
+                    proc.kill()
 
-                    if Path(output_file).exists():
-                        with open(output_file) as f:
-                            for line in f:
-                                line = line.strip()
-                                if line:
-                                    try:
-                                        entry = json.loads(line)
-                                        self.scan_results.append(entry)
-                                        self._add_finding_from_nuclei(entry)
-                                    except json.JSONDecodeError:
-                                        continue
-                        Path(output_file).unlink(missing_ok=True)
-                except FileNotFoundError:
-                    logger.debug(f"Nuclei template '{template}' not found")
-                except Exception as e:
-                    logger.debug(f"Nuclei scan failed for '{template}': {e}")
+                if Path(output_file).exists():
+                    with open(output_file) as f:
+                        for line in f:
+                            line = line.strip()
+                            if line:
+                                try:
+                                    entry = json.loads(line)
+                                    self.scan_results.append(entry)
+                                    self._add_finding_from_nuclei(entry)
+                                except json.JSONDecodeError:
+                                    continue
+                    Path(output_file).unlink(missing_ok=True)
+            except Exception as e:
+                logger.debug(f"Nuclei scan failed: {e}")
 
         except Exception as e:
             logger.error(f"{self.name}: Failed: {e}")

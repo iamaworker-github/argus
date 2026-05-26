@@ -35,6 +35,7 @@ class SSRFAgent(BaseAgent):
 
         await self._test_url_parameters()
         await self._test_file_upload()
+        await self._run_nuclei_tags(tags=["ssrf", "server-side-request-forgery", "oob-ssrf"], severity="high")
 
         return AgentResult(
             agent_name=self.name,

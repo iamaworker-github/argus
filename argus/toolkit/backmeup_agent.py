@@ -156,14 +156,16 @@ class BackMeUpAgent(BaseAgent):
         # Go tools (pre-compiled binaries)
         go_tasks = [
             self._run_tool(["waybackurls", target], name="waybackurls"),
-            self._run_tool(["gau", "--subs", target], name="gau"),
+            self._run_tool(["gau", target], name="gau"),
         ]
         # Cariddi
         if self._check_tool("cariddi"):
             go_tasks.append(self._run_tool(["cariddi", "-s", "-d", "2", "-c", "100", "-e", "-intensive", "-rua", target], name="cariddi"))
         # Katana passive
         if self._check_tool("katana"):
-            go_tasks.append(self._run_tool(["katana", "-passive", "-jc", "-silent"], input_data=target, name="katana"))
+            katana_cmd = ["katana", "-passive", "-jc", "-silent"]
+            katana_cmd.extend(self.format_auth_args())
+            go_tasks.append(self._run_tool(katana_cmd, input_data=target, name="katana"))
         results = await asyncio.gather(*go_tasks, return_exceptions=True)
         for r in results:
             if isinstance(r, set):
@@ -173,7 +175,7 @@ class BackMeUpAgent(BaseAgent):
         await self.check_pause()
         # Python-native API sources (always available)
         import httpx
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=30, headers=self.get_http_client_headers()) as client:
             api_tasks = [
                 self._fetch_wayback(client, target),
                 self._fetch_commoncrawl(client, target),

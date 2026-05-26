@@ -67,8 +67,22 @@ class PlanAgent(BaseAgent):
         self.llm_client = LLMClient()
         self.registry = get_skill_registry()
 
+    async def _emit_thought(self, thought: str, thought_type: str = "reasoning", phase: str = "") -> None:
+        if self.event_bus:
+            try:
+                from argus.core.events import AgentThinkingEvent
+                await self.event_bus.publish_event(AgentThinkingEvent(
+                    agent_name=self.name,
+                    thought=thought,
+                    thought_type=thought_type,
+                    phase=phase or "",
+                ))
+            except Exception:
+                pass
+
     async def execute(self) -> AgentResult:
         logger.info(f"{self.name}: Analyzing target {self.target} for optimal agent selection...")
+        await self._emit_thought(f"Analyzing target {self.target} for optimal agent selection...", "analyzing", "planning")
 
         config = getattr(self.llm_client, 'config', None)
         has_ai = config and getattr(config, 'has_ai_enabled', False)
@@ -112,6 +126,7 @@ class PlanAgent(BaseAgent):
 
     async def _ai_plan(self) -> AgentPlan:
         available = list(CATEGORY_AGENTS.keys())
+        await self._emit_thought(f"Calling LLM to analyze target {self.target}...", "reasoning", "planning")
         prompt = f"""Target: {self.target}
 Available agents: {json.dumps(available)}
 Scope: {self.scope or 'none'}
@@ -128,7 +143,9 @@ Rules:
 
         try:
             response = await self.llm_client.generate(prompt=prompt, max_tokens=300, temperature=0.3)
+            await self._emit_thought(f"LLM response received: {response.content[:200]}", "reasoning", "planning")
             parsed = extract_json_safe(response.content.strip(), {})
+            cats = parsed.get("categories", ["web", "recon"])
             cats = [c for c in cats if c in CATEGORY_AGENTS]
             if not cats:
                 cats = ["web", "recon"]

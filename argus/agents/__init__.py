@@ -20,6 +20,15 @@ def _ensure_loaded():
         from argus.agents.command_injection_agent import CommandInjectionAgent
         from argus.agents.authentication_agent import AuthenticationAgent
         from argus.agents.idor_agent import IDORAgent
+        from argus.agents.xxe_agent import XXEAgent
+        from argus.agents.ssti_agent import SSTIAgent
+        from argus.agents.open_redirect_agent import OpenRedirectAgent
+        from argus.agents.cors_agent import CORSAgent
+        from argus.agents.clickjacking_agent import ClickjackingAgent
+        from argus.agents.nosql_injection_agent import NoSQLInjectionAgent
+        from argus.agents.host_header_injection_agent import HostHeaderInjectionAgent
+        from argus.agents.jwt_attack_agent import JWTTAttackAgent
+        from argus.agents.rate_limit_agent import RateLimitAgent
         from argus.agents.autonomous_agent import AutonomousSecurityAgent
         from argus.agents.strix_pentest_agent import StrixPentestAgent
         from argus.agents.poc_validator_agent import PoCValidatorAgent
@@ -29,6 +38,11 @@ def _ensure_loaded():
             "SQLInjectionAgent": SQLInjectionAgent, "XSSAgent": XSSAgent, "SSRFAgent": SSRFAgent,
             "ReconAgent": ReconAgent, "CommandInjectionAgent": CommandInjectionAgent,
             "AuthenticationAgent": AuthenticationAgent, "IDORAgent": IDORAgent,
+            "XXEAgent": XXEAgent, "SSTIAgent": SSTIAgent,
+            "OpenRedirectAgent": OpenRedirectAgent, "CORSAgent": CORSAgent,
+            "ClickjackingAgent": ClickjackingAgent, "NoSQLInjectionAgent": NoSQLInjectionAgent,
+            "HostHeaderInjectionAgent": HostHeaderInjectionAgent, "JWTTAttackAgent": JWTTAttackAgent,
+            "RateLimitAgent": RateLimitAgent,
             "AutonomousSecurityAgent": AutonomousSecurityAgent,
             "StrixPentestAgent": StrixPentestAgent, "PoCValidatorAgent": PoCValidatorAgent,
         })
@@ -57,6 +71,9 @@ __all__ = [
     "AgentOrchestrator", "ScanResult",
     "SQLInjectionAgent", "XSSAgent", "SSRFAgent", "ReconAgent",
     "CommandInjectionAgent", "AuthenticationAgent", "IDORAgent",
+    "XXEAgent", "SSTIAgent", "OpenRedirectAgent", "CORSAgent",
+    "ClickjackingAgent", "NoSQLInjectionAgent", "HostHeaderInjectionAgent",
+    "JWTTAttackAgent", "RateLimitAgent",
     "AutonomousSecurityAgent", "StrixPentestAgent", "PoCValidatorAgent",
     "get_default_agents",
 ]

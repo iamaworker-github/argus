@@ -33,6 +33,7 @@ class AuthenticationAgent(BaseAgent):
         await self._test_weak_credentials()
         await self._test_session_management()
         await self._test_password_reset()
+        await self._run_nuclei_tags(tags=["auth", "authentication", "default-login", "weak-login"], severity="high")
 
         return AgentResult(
             agent_name=self.name,

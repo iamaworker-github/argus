@@ -115,28 +115,28 @@ class WafDetectionAgent(BaseAgent):
 
     async def _detect_waf_wafw00f(self) -> None:
         try:
-            import subprocess
-            result = subprocess.run(
-                ["wafw00f", self.target, "-o", "json"],
-                capture_output=True, text=True, timeout=30,
+            proc = await asyncio.create_subprocess_exec(
+                "wafw00f", self.target, "-o", "json",
+                stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
             )
-            if result.returncode == 0 and result.stdout.strip():
-                data = json.loads(result.stdout)
-                if isinstance(data, list):
-                    for entry in data:
-                        waf_name = entry.get("name", "") if isinstance(entry, dict) else ""
+            try:
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
+                if stdout:
+                    data = json.loads(stdout.decode())
+                    if isinstance(data, list):
+                        for entry in data:
+                            waf_name = entry.get("name", "") if isinstance(entry, dict) else ""
+                            if waf_name and waf_name.lower() != "generic":
+                                self.detected_wafs.append(waf_name)
+                    elif isinstance(data, dict):
+                        waf_name = data.get("name", "") or data.get("firewall", "")
                         if waf_name and waf_name.lower() != "generic":
                             self.detected_wafs.append(waf_name)
-                elif isinstance(data, dict):
-                    waf_name = data.get("name", "") or data.get("firewall", "")
-                    if waf_name and waf_name.lower() != "generic":
-                        self.detected_wafs.append(waf_name)
-            if not self.detected_wafs and result.stdout:
-                for line in result.stdout.split("\n"):
-                    if "behind" in line.lower() and "waf" in line.lower():
-                        parts = line.split("WAF")
-                        if len(parts) > 1:
-                            self.detected_wafs.append(parts[-1].strip().strip("."))
+                if not self.detected_wafs:
+                    pass
+            except asyncio.TimeoutError:
+                proc.kill()
+                logger.debug("wafw00f timed out")
         except Exception as e:
             logger.debug(f"wafw00f failed: {e}")
 

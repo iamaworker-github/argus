@@ -24,6 +24,7 @@ class IDORAgent(BaseAgent):
         logger.info(f"{self.name}: Testing {self.target}")
 
         await self._probe_object_reference_surfaces()
+        await self._run_nuclei_tags(tags=["idor", "insecure-direct-object-reference", "authorization"], severity="high")
 
         return AgentResult(
             agent_name=self.name,

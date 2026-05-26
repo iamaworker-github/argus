@@ -37,6 +37,7 @@ class CommandInjectionAgent(BaseAgent):
 
         await self._test_parameters()
         await self._test_time_based()
+        await self._run_nuclei_tags(tags=["command-injection", "cmd-injection", "rce"], severity="critical")
 
         return AgentResult(
             agent_name=self.name,
