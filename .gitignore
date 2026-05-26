@@ -36,6 +36,4 @@ Thumbs.db
 # Node
 node_modules/
 
-# Docker
-Dockerfile
-docker-compose*.yml
+
