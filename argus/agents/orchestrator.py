@@ -117,6 +117,40 @@ class AgentOrchestrator:
         # Memory System support (optional for backward compatibility)
         self.memory_manager: Optional['MemoryManager'] = memory_manager
 
+        # Task tracking for cancellation
+        self._running_tasks: Dict[str, asyncio.Task] = {}
+        self._scan_task: Optional[asyncio.Task] = None
+
+    def cancel_agent(self, agent_name: str) -> None:
+        """Cancel a running agent by name. Sets its cancel flag and cancels the task."""
+        task = self._running_tasks.get(agent_name)
+        if task and not task.done():
+            task.cancel()
+            logger.info(f"Task cancelled for agent: {agent_name}")
+        for agent in self.agents:
+            if agent.name == agent_name:
+                agent.cancel()
+                break
+
+    def cancel_all(self) -> None:
+        """Cancel all running agents."""
+        for name in list(self._running_tasks.keys()):
+            self.cancel_agent(name)
+
+    def pause_agent(self, agent_name: str) -> None:
+        """Pause a running agent."""
+        for agent in self.agents:
+            if agent.name == agent_name:
+                agent.pause()
+                break
+
+    def resume_agent(self, agent_name: str) -> None:
+        """Resume a paused agent."""
+        for agent in self.agents:
+            if agent.name == agent_name:
+                agent.resume()
+                break
+
     def add_agent(self, agent: BaseAgent) -> None:
         """Add an agent to the orchestrator"""
         if self.scope:
@@ -364,7 +398,23 @@ class AgentOrchestrator:
                 )
             else:
                 logger.info(f"▶ Running {agent.name}...")
-                result = await agent.run()
+                async def _run_agent(a):
+                    return await a.run()
+                task = asyncio.create_task(_run_agent(agent))
+                self._running_tasks[agent.name] = task
+                try:
+                    result = await task
+                except asyncio.CancelledError:
+                    logger.info(f"{agent.name} was cancelled")
+                    result = AgentResult(
+                        agent_name=agent.name,
+                        status=AgentStatus.FAILED,
+                        findings=agent.findings,
+                        execution_time=0,
+                        error="Cancelled",
+                    )
+                finally:
+                    self._running_tasks.pop(agent.name, None)
 
             self.results.append(result)
             self.all_findings.extend(result.findings)
@@ -518,8 +568,24 @@ class AgentOrchestrator:
                     )
                 with trace(f"agent:{agent.name}", target=self.target):
                     logger.info(f"▶ Running {agent.name}...")
-                    result = await agent.run()
-                    return result
+                    # Register task for cancellation support
+                    task = asyncio.current_task()
+                    if task:
+                        self._running_tasks[agent.name] = task
+                    try:
+                        result = await agent.run()
+                        return result
+                    except asyncio.CancelledError:
+                        logger.info(f"{agent.name} was cancelled")
+                        return AgentResult(
+                            agent_name=agent.name,
+                            status=AgentStatus.FAILED,
+                            findings=agent.findings,
+                            execution_time=0.0,
+                            error="Cancelled",
+                        )
+                    finally:
+                        self._running_tasks.pop(agent.name, None)
             except Exception as e:
                 logger.error(f"Agent {agent.name} failed: {e}")
                 return AgentResult(

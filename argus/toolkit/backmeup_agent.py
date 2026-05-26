@@ -58,6 +58,10 @@ class BackMeUpAgent(BaseAgent):
 
         all_urls: Set[str] = set()
         for t in targets:
+            if self.should_stop:
+                logger.info(f"{self.name}: Cancelled during target iteration")
+                break
+            await self.check_pause()
             urls = await self._run_all_tools(t)
             all_urls.update(urls)
 
@@ -75,6 +79,16 @@ class BackMeUpAgent(BaseAgent):
 
         stats = ", ".join(f"{k}:{v}" for k, v in self._run_stats.items())
         logger.info(f"{self.name}: {len(self._collected_urls)} root URLs ({len(self._filtered_urls)} subs filtered) [{stats}]")
+
+        if self.should_stop:
+            logger.info(f"{self.name}: Cancelled, returning partial results")
+            return AgentResult(
+                agent_name=self.name, status=AgentStatus.FAILED,
+                findings=self.findings, execution_time=0,
+                metadata={"domain": self._domain, "total_urls": len(all_urls),
+                          "root_urls": len(self._collected_urls),
+                          "cancelled": True},
+            )
 
         self._analyze_leaks()
         self.add_finding(Finding(
@@ -105,6 +119,9 @@ class BackMeUpAgent(BaseAgent):
         )
 
     async def _run_tool(self, cmd: List[str], input_data: Optional[str] = None, name: str = "tool") -> Set[str]:
+        if self.should_stop:
+            return set()
+        await self.check_pause()
         urls: Set[str] = set()
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -151,6 +168,9 @@ class BackMeUpAgent(BaseAgent):
         for r in results:
             if isinstance(r, set):
                 all_urls.update(r)
+        if self.should_stop:
+            return all_urls
+        await self.check_pause()
         # Python-native API sources (always available)
         import httpx
         async with httpx.AsyncClient(timeout=30) as client:

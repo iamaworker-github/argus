@@ -1,265 +1,180 @@
-import type { SystemState } from '../types';
+import type { Agent, AgentStatus } from '../types';
 
 interface Props {
-  state: SystemState;
-  selectedAgent: string;
-  onSelectAgent: (id: string) => void;
+  agents: Agent[];
+  cpu: number;
+  mem: number;
+  net: number;
+  tokens: number;
+  credits: number;
+  elapsed: string;
+  llmModel: string;
+  riskProfile: string;
+  maxParallel: string;
+  safeMode: boolean;
+  onPause: (id: string) => void;
+  onResume: (id: string) => void;
+  onKill: (id: string) => void;
 }
 
-function EagleLogo() {
+const statusColors: Record<AgentStatus, string> = {
+  Done: 'text-cyan-400',
+  Running: 'text-green-400',
+  Idle: 'text-zinc-500',
+  Paused: 'text-yellow-400',
+  Killed: 'text-red-500',
+};
+
+const statusDot: Record<AgentStatus, string> = {
+  Done: 'bg-cyan-400',
+  Running: 'bg-green-400',
+  Idle: 'bg-zinc-600',
+  Paused: 'bg-yellow-400',
+  Killed: 'bg-red-500',
+};
+
+function Bar({ value, color }: { value: number; color: string }) {
   return (
-    <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
-      {/* Hexagon border */}
-      <polygon
-        points="30,3 55,17 55,43 30,57 5,43 5,17"
-        fill="#080f08"
-        stroke="#00ff88"
-        strokeWidth="1.5"
+    <div className="flex-1 h-1.5 bg-zinc-700 rounded-full overflow-hidden">
+      <div
+        className={`h-full rounded-full ${color}`}
+        style={{ width: `${value}%`, transition: 'width 1s ease' }}
       />
-      {/* Inner glow ring */}
-      <polygon
-        points="30,7 51,19 51,41 30,53 9,41 9,19"
-        fill="none"
-        stroke="#00440022"
-        strokeWidth="4"
-      />
-
-      {/* Eagle body - stylized */}
-      {/* Wings spread */}
-      <path d="M15 28 C10 24 7 20 10 16 C14 18 18 22 22 26" fill="#00aa44" opacity="0.7"/>
-      <path d="M45 28 C50 24 53 20 50 16 C46 18 42 22 38 26" fill="#00aa44" opacity="0.7"/>
-
-      {/* Body */}
-      <ellipse cx="30" cy="32" rx="8" ry="10" fill="#005522" opacity="0.8"/>
-
-      {/* Head */}
-      <circle cx="30" cy="20" r="8" fill="#00cc55" opacity="0.9"/>
-      <circle cx="30" cy="20" r="6" fill="#004422"/>
-      <circle cx="30" cy="20" r="5" fill="#00aa44" opacity="0.3"/>
-
-      {/* Beak */}
-      <path d="M35 20 L40 22 L35 23 Z" fill="#f0a500"/>
-      <path d="M35 20 L40 21 L35 21.5 Z" fill="#c47f00"/>
-
-      {/* Eye */}
-      <circle cx="33" cy="19" r="2.5" fill="#000"/>
-      <circle cx="33" cy="19" r="1.5" fill="#ff4444" opacity="0.8"/>
-      <circle cx="33.5" cy="18.5" r="0.6" fill="#fff"/>
-
-      {/* Chest detail */}
-      <path d="M26 28 L30 40 L34 28 C32 30 28 30 26 28Z" fill="#009944" opacity="0.6"/>
-
-      {/* Wing feathers detail */}
-      <path d="M14 26 C10 23 8 18 12 15" stroke="#00ff88" strokeWidth="0.6" opacity="0.4" fill="none"/>
-      <path d="M14 29 C9 26 7 21 10 18" stroke="#00ff88" strokeWidth="0.6" opacity="0.3" fill="none"/>
-      <path d="M46 26 C50 23 52 18 48 15" stroke="#00ff88" strokeWidth="0.6" opacity="0.4" fill="none"/>
-      <path d="M46 29 C51 26 53 21 50 18" stroke="#00ff88" strokeWidth="0.6" opacity="0.3" fill="none"/>
-
-      {/* Talons */}
-      <path d="M26 42 L24 46 M26 42 L26 47 M26 42 L28 46" stroke="#00ff88" strokeWidth="0.8" opacity="0.6"/>
-      <path d="M34 42 L32 46 M34 42 L34 47 M34 42 L36 46" stroke="#00ff88" strokeWidth="0.8" opacity="0.6"/>
-    </svg>
-  );
-}
-
-function SysBar({ label, value, color = '#00ff88' }: { label: string; value: number; color?: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-      <span style={{ color: '#3a5a3a', fontSize: '8.5px', width: '26px', flexShrink: 0 }}>{label}</span>
-      <div style={{ flex: 1, height: '4px', background: '#1a2a1a', borderRadius: '2px', overflow: 'hidden' }}>
-        <div style={{
-          width: `${value}%`,
-          height: '100%',
-          background: color,
-          borderRadius: '2px',
-          boxShadow: `0 0 4px ${color}55`,
-          transition: 'width 0.5s ease',
-        }} />
-      </div>
-      <span style={{ color: '#4a7a4a', fontSize: '8.5px', width: '26px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-        {Math.round(value)}%
-      </span>
     </div>
   );
 }
 
-function AgentStatusDot({ status }: { status: string }) {
-  const color = status === 'Running' ? '#00ff88' : status === 'Queued' ? '#f0a500' : '#3b82f6';
-  const isAnimated = status === 'Running' || status === 'Queued';
-  return (
-    <div style={{
-      width: '7px',
-      height: '7px',
-      borderRadius: '50%',
-      background: color,
-      flexShrink: 0,
-      boxShadow: isAnimated ? `0 0 6px ${color}` : 'none',
-      animation: isAnimated ? (status === 'Running' ? 'pulse-green 1.5s ease-in-out infinite' : 'pulse-amber 1.5s ease-in-out infinite') : 'none',
-    }} />
-  );
-}
-
-export default function LeftPanel({ state, selectedAgent, onSelectAgent }: Props) {
-  const tokenPct = Math.min(100, Math.round((state.tokens / state.maxTokens) * 100));
-  const tokenLabel = `${(state.tokens / 1000000).toFixed(1)}M / ${(state.maxTokens / 1000000).toFixed(1)}M`;
-
-  const agentTextColor = (s: string) =>
-    s === 'Running' ? '#00ff88' : s === 'Queued' ? '#f0a500' : '#3b82f6';
+export default function LeftPanel({ agents, cpu, mem, net, tokens, credits, elapsed, llmModel, riskProfile, maxParallel, safeMode, onPause, onResume, onKill }: Props) {
+  const runningCount = agents.filter(a => a.status === 'Running').length;
+  const totalCount = agents.length;
 
   return (
-    <div style={{
-      width: '200px',
-      minWidth: '200px',
-      borderRight: '1px solid #1a2a1a',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100%',
-      overflowY: 'auto',
-      background: '#090d09',
-    }}>
+    <div className="w-56 shrink-0 border-r border-zinc-700 bg-zinc-950 flex flex-col overflow-y-auto text-xs font-mono">
+      {/* Status */}
+      <div className="p-2 border-b border-zinc-800">
+        <div className="text-zinc-500 uppercase text-[13px] tracking-widest mb-1">Status</div>
+        <div className="text-green-400 font-bold tracking-widest text-[13px]">EXECUTING</div>
+        <div className="text-zinc-500 mt-1 text-[13px]">MODE</div>
+        <div className="text-zinc-300 text-[12px]">PENTEST</div>
+      </div>
 
-      {/* ── Status card ── */}
-      <div style={{ padding: '8px', borderBottom: '1px solid #1a2a1a', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-          <EagleLogo />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px', paddingTop: '4px' }}>
-            <span style={{ color: '#2a4a2a', fontSize: '7.5px', letterSpacing: '0.15em' }}>STATUS</span>
-            <div style={{
-              color: '#00ff88',
-              fontSize: '15px',
-              fontWeight: 700,
-              letterSpacing: '0.04em',
-              textShadow: '0 0 10px rgba(0,255,136,0.5)',
-              lineHeight: 1.1,
-            }}>
-              EXECUTING
-            </div>
-            <div style={{ marginTop: '4px' }}>
-              <span style={{ color: '#2a4a2a', fontSize: '7.5px', letterSpacing: '0.1em' }}>MODE</span>
-              <div style={{ color: '#6a8a6a', fontSize: '9px' }}>Autonomous</div>
-            </div>
-          </div>
+      {/* Risk Profile */}
+      <div className="p-2 border-b border-zinc-800 space-y-1">
+        <div className="flex justify-between items-center">
+          <span className="text-zinc-500 text-[13px]">Risk Profile</span>
+          <span className="text-zinc-300 text-[13px]">{riskProfile}</span>
         </div>
-        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#2a4a2a', fontSize: '8px', letterSpacing: '0.1em' }}>RISK PROFILE</span>
-            <span style={{ color: '#6a8a6a', fontSize: '9px' }}>{state.riskProfile}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-zinc-500 text-[13px]">Max Parallel</span>
+          <span className="text-zinc-300 text-[13px]">{maxParallel}</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-zinc-500 text-[13px]">Safe Mode</span>
+          <span className={`text-[13px] font-bold ${safeMode ? 'text-green-400' : 'text-red-400'}`}>{safeMode ? 'ON' : 'OFF'}</span>
+        </div>
+      </div>
+
+      {/* Agents */}
+      <div className="p-2 border-b border-zinc-800">
+        <div className="text-zinc-500 text-[13px] uppercase tracking-widest mb-1">
+          Agents [{runningCount}/{totalCount}]
+        </div>
+        <div className="flex flex-col gap-1">
+          {agents.map((agent) => (
+            <div key={agent.id} className="group">
+              <div className="flex items-center gap-1">
+                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${statusDot[agent.status]} ${agent.status === 'Running' ? 'animate-pulse' : ''}`} />
+                <span className={`text-[13px] truncate flex-1 ${statusColors[agent.status]}`}>
+                  {agent.name}
+                </span>
+                <span className={`text-[12px] font-bold ${statusColors[agent.status]}`}>
+                  {agent.status === 'Done' ? '✓' : agent.status === 'Running' ? '▶' : agent.status === 'Paused' ? '⏸' : agent.status === 'Killed' ? '✕' : '○'}
+                </span>
+              </div>
+              {/* FIX: Pause/Kill controls per agent */}
+              {(agent.status === 'Running' || agent.status === 'Paused') && (
+                <div className="flex gap-1 mt-0.5 pl-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {agent.status === 'Running' && (
+                    <button
+                      onClick={() => onPause(agent.id)}
+                      className="text-[12px] text-yellow-400 hover:text-yellow-300 border border-yellow-700 hover:border-yellow-400 px-1 rounded"
+                    >
+                      ⏸ Pause
+                    </button>
+                  )}
+                  {agent.status === 'Paused' && (
+                    <button
+                      onClick={() => onResume(agent.id)}
+                      className="text-[12px] text-green-400 hover:text-green-300 border border-green-700 hover:border-green-400 px-1 rounded"
+                    >
+                      ▶ Resume
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onKill(agent.id)}
+                    className="text-[12px] text-red-400 hover:text-red-300 border border-red-800 hover:border-red-500 px-1 rounded"
+                  >
+                    ✕ Kill
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+
+
+      {/* System Health */}
+      <div className="p-2 border-b border-zinc-800">
+        <div className="text-zinc-500 text-[13px] uppercase tracking-widest mb-1.5">System Health</div>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-1">
+            <span className="text-zinc-400 text-[13px] w-6">CPU</span>
+            <Bar value={cpu} color="bg-green-500" />
+            <span className="text-zinc-400 text-[13px] w-5 text-right">{cpu}%</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#2a4a2a', fontSize: '8px', letterSpacing: '0.1em' }}>MAX PARALLEL</span>
-            <span style={{ color: '#6a8a6a', fontSize: '9px' }}>{state.maxParallel}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-zinc-400 text-[13px] w-6">MEM</span>
+            <Bar value={mem} color="bg-yellow-500" />
+            <span className="text-zinc-400 text-[13px] w-5 text-right">{mem}%</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#2a4a2a', fontSize: '8px', letterSpacing: '0.1em' }}>SAFE MODE</span>
-            <span style={{ color: '#00ff88', fontSize: '9px', fontWeight: 600 }}>{state.safeMode ? 'ON' : 'OFF'}</span>
+          <div className="flex items-center gap-1">
+            <span className="text-zinc-400 text-[13px] w-6">NET</span>
+            <Bar value={net} color="bg-cyan-500" />
+            <span className="text-zinc-400 text-[13px] w-5 text-right">{net}%</span>
           </div>
         </div>
       </div>
 
-      {/* ── Agents ── */}
-      <div style={{ flexShrink: 0, borderBottom: '1px solid #1a2a1a' }}>
-        <div style={{
-          padding: '4px 8px',
-          borderBottom: '1px solid #111a11',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <span style={{ color: '#3a5a3a', fontSize: '8.5px', letterSpacing: '0.12em' }}>
-            AGENTS [{state.agents.filter(a => a.status === 'Running').length}/{state.agents.length}]
+      {/* Tokens / Credits */}
+      <div className="p-2">
+        <div className="flex justify-between text-[13px] mb-0.5">
+          <span className="text-zinc-500">TOKENS</span>
+          <span className="text-zinc-300">{(tokens / 1000).toFixed(1)}M / 2M</span>
+        </div>
+        <div className="w-full h-1 bg-zinc-700 rounded overflow-hidden mb-2">
+          <div className="h-full bg-purple-500 rounded" style={{ width: `${(tokens / 2000) * 100}%` }} />
+        </div>
+        <div className="flex justify-between text-[13px] mb-0.5">
+          <span className="text-zinc-500">CREDITS</span>
+          <span className="text-zinc-300">{credits.toLocaleString()}</span>
+        </div>
+        <div className="flex justify-between text-[13px]">
+          <span className="text-zinc-500">UPTIME</span>
+          <span className="text-zinc-300">{elapsed}</span>
+        </div>
+        <div className="flex justify-between text-[13px] mt-1">
+          <span className="text-zinc-500">AI</span>
+          <span className={`${llmModel && llmModel !== 'AI OFF' ? 'text-green-400' : 'text-red-400'} text-[13px]`}>
+            {llmModel && llmModel !== 'AI OFF' ? 'On' : 'Off'}
           </span>
         </div>
-
-        {state.agents.map(agent => (
-          <div
-            key={agent.id}
-            onClick={() => onSelectAgent(agent.id)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '5px 8px 5px 10px',
-              borderBottom: '1px solid #0c130c',
-              cursor: 'pointer',
-              background: selectedAgent === agent.id ? '#0d1f0d' : 'transparent',
-              borderLeft: selectedAgent === agent.id ? '2px solid #00ff88' : '2px solid transparent',
-              transition: 'background 0.15s',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ color: agent.color, fontSize: '10px' }}>⬡</span>
-              <span style={{ color: '#9ab89a', fontSize: '9.5px' }}>{agent.name}</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <AgentStatusDot status={agent.status} />
-              <span style={{ color: agentTextColor(agent.status), fontSize: '8.5px' }}>{agent.status}</span>
-            </div>
-          </div>
-        ))}
-
-        {/* Special rows */}
-        {[
-          { icon: '+', label: 'New Agent', right: 'Launch', rightColor: '#f0a500' },
-          { icon: '⚙', label: 'Orchestrator', right: 'Active', rightColor: '#00ff88' },
-          { icon: '🧠', label: 'Memory', right: `${state.memoryPercent}%`, rightColor: '#f0a500' },
-          { icon: '📚', label: 'Knowledge Base', right: state.knowledgeBase, rightColor: '#3b82f6' },
-        ].map((row, i) => (
-          <div key={i} style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '4px 8px',
-            borderBottom: '1px solid #0c130c',
-            cursor: 'pointer',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span style={{ color: '#3a5a3a', fontSize: '10px' }}>{row.icon}</span>
-              <span style={{ color: '#4a6a4a', fontSize: '9px' }}>{row.label}</span>
-            </div>
-            <span style={{ color: row.rightColor, fontSize: '9px' }}>{row.right}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* ── System Health ── */}
-      <div style={{ padding: '8px', borderBottom: '1px solid #1a2a1a', flexShrink: 0 }}>
-        <div style={{ color: '#2a4a2a', fontSize: '8px', letterSpacing: '0.15em', marginBottom: '8px' }}>
-          SYSTEM HEALTH
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-          <SysBar label="CPU" value={state.cpu} />
-          <SysBar label="MEM" value={state.mem} />
-          <SysBar label="NET" value={state.net} />
-        </div>
-      </div>
-
-      {/* ── Tokens ── */}
-      <div style={{ padding: '8px', borderBottom: '1px solid #1a2a1a', flexShrink: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-          <span style={{ color: '#2a4a2a', fontSize: '8px', letterSpacing: '0.12em' }}>TOKENS</span>
-          <span style={{ color: '#5a7a5a', fontSize: '8.5px', fontVariantNumeric: 'tabular-nums' }}>{tokenLabel}</span>
-        </div>
-        {/* Segmented token bar */}
-        <div style={{ height: '5px', background: '#1a2a1a', borderRadius: '3px', overflow: 'hidden', display: 'flex' }}>
-          <div style={{ width: `${Math.min(tokenPct, 60)}%`, background: '#00ff88', transition: 'width 0.5s' }} />
-          <div style={{ width: `${Math.max(0, Math.min(tokenPct - 60, 20))}%`, background: '#f0a500', transition: 'width 0.5s' }} />
-          <div style={{ width: `${Math.max(0, tokenPct - 80)}%`, background: '#ff4444', transition: 'width 0.5s' }} />
-        </div>
-      </div>
-
-      {/* ── Credits & Uptime ── */}
-      <div style={{ padding: '8px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#2a4a2a', fontSize: '8px', letterSpacing: '0.1em' }}>CREDITS</span>
-            <span style={{ color: '#00ff88', fontSize: '12px', fontWeight: 600 }}>
-              {state.credits.toLocaleString()}
-            </span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#2a4a2a', fontSize: '8px', letterSpacing: '0.1em' }}>UPTIME</span>
-            <span style={{ color: '#5a7a5a', fontSize: '9px', fontVariantNumeric: 'tabular-nums' }}>{state.uptime}</span>
-          </div>
+        <div className="flex justify-between text-[13px]">
+          <span className="text-zinc-500">Model</span>
+          <span className="text-zinc-300 text-[13px] truncate max-w-[120px] text-right">
+            {llmModel && llmModel !== 'AI OFF' ? llmModel : '-'}
+          </span>
         </div>
       </div>
     </div>

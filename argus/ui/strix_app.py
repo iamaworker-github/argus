@@ -5,8 +5,12 @@ Complete redesign matching Strix's UI/UX
 
 import asyncio
 import time
+import psutil
 from datetime import datetime
 from typing import Any, Optional, List, ClassVar, Dict
+
+from argus.agents.llm_client import get_cost_tracker, LLMClient
+from argus.core.config import get_config
 from textual.app import App, ComposeResult
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.widgets import Static, Tree, Label, Input, Button, OptionList
@@ -651,23 +655,94 @@ class AgentsPanel(Vertical):
 
 
 class SystemHealthPanel(Vertical):
-    """System health monitoring panel"""
+    """System health monitoring panel — live via psutil"""
 
     def compose(self) -> ComposeResult:
         yield Static("💻 System Health", id="health_header")
-        yield Static("● CPU: 45%", id="cpu_status")
-        yield Static("● MEM: 62%", id="mem_status")
-        yield Static("● NET: 🟢", id="net_status")
+        yield Static("● CPU: 0%", id="cpu_status")
+        yield Static("● MEM: 0%", id="mem_status")
+        yield Static("● NET: 0 B/s", id="net_status")
+
+    def on_mount(self) -> None:
+        self._prev_net = psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv
+        self._prev_time = time.monotonic()
+        self.set_interval(2.0, self._refresh)
+
+    def _refresh(self) -> None:
+        try:
+            cpu = psutil.cpu_percent(interval=None)
+            self.query_one("#cpu_status", Static).update(f"● CPU: {cpu:.0f}%")
+        except Exception:
+            pass
+        try:
+            mem = psutil.virtual_memory().percent
+            self.query_one("#mem_status", Static).update(f"● MEM: {mem:.0f}%")
+        except Exception:
+            pass
+        try:
+            now = time.monotonic()
+            cur = psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv
+            elapsed = now - self._prev_time
+            rate = (cur - self._prev_net) / elapsed if elapsed > 0 else 0
+            self._prev_net = cur
+            self._prev_time = now
+            if rate >= 1_048_576:
+                label = f"{rate / 1_048_576:.1f} MB/s"
+            elif rate >= 1_024:
+                label = f"{rate / 1_024:.0f} KB/s"
+            else:
+                label = f"{rate:.0f} B/s"
+            self.query_one("#net_status", Static).update(f"● NET: {label}")
+        except Exception:
+            pass
 
 
 class ResourcePanel(Vertical):
-    """Resource usage panel"""
+    """Resource usage panel — live via CostTracker + uptime + LLM status"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._start = time.monotonic()
 
     def compose(self) -> ComposeResult:
         yield Static("💎 Resources", id="resources_header")
-        yield Static("● Tokens: 1,250", id="tokens_status")
-        yield Static("● Credits: 850", id="credits_status")
-        yield Static("● Uptime: 2h 15m", id="uptime_status")
+        yield Static("● Tokens: 0", id="tokens_status")
+        yield Static("● Cost: $0.0000", id="cost_status")
+        yield Static("● Uptime: 0s", id="uptime_status")
+        yield Static("● AI: Off", id="ai_status")
+        yield Static("  Model: -", id="model_status")
+
+    def on_mount(self) -> None:
+        self.set_interval(2.0, self._refresh)
+
+    def _refresh(self) -> None:
+        try:
+            tracker = get_cost_tracker()
+            total = tracker.total_tokens
+            cost = tracker.total_cost
+            self.query_one("#tokens_status", Static).update(f"● Tokens: {total:,}")
+            self.query_one("#cost_status", Static).update(f"● Cost: ${cost:.4f}")
+        except Exception:
+            pass
+        try:
+            elapsed = time.monotonic() - self._start
+            h, rem = divmod(int(elapsed), 3600)
+            m, s = divmod(rem, 60)
+            self.query_one("#uptime_status", Static).update(f"● Uptime: {h}h {m}m {s}s")
+        except Exception:
+            pass
+        try:
+            cfg = get_config()
+            if cfg.has_ai_enabled:
+                client = LLMClient()
+                model = client.model
+                self.query_one("#ai_status", Static).update("● AI: On")
+                self.query_one("#model_status", Static).update(f"  Model: {model}")
+            else:
+                self.query_one("#ai_status", Static).update("● AI: Off")
+                self.query_one("#model_status", Static).update("  Model: -")
+        except Exception:
+            pass
 
 
 class VulnerabilitiesPanel(VerticalScroll):
@@ -1555,12 +1630,12 @@ class ArgusStrixApp(App):
             pass
 
     def action_confirm_stop_agent(self, agent_id: str) -> None:
-        """Handle confirmation to stop an agent.
-
-        Currently this is a placeholder – we log the request.
-        """
+        """Handle confirmation to stop an agent — cancels via orchestrator."""
         logger.info(f"Stop agent requested: {agent_id}")
-        # TODO: Integrate with orchestrator to cancel the agent's task if needed.
+        if self.orchestrator:
+            self.orchestrator.cancel_agent(agent_id)
+        else:
+            logger.warning("No orchestrator available to cancel agent")
 
 
     def _handle_mode_selection(self, mode: str | None) -> None:
@@ -1748,8 +1823,10 @@ class ArgusStrixApp(App):
             stats_scroll = VerticalScroll(stats_display, id="stats_scroll")
 
             vulnerabilities_panel = VulnerabilitiesPanel(id="vulnerabilities_panel")
+            health_panel = SystemHealthPanel(id="health_panel")
+            resource_panel = ResourcePanel(id="resource_panel")
 
-            sidebar = Vertical(agents_tree, vulnerabilities_panel, stats_scroll, id="sidebar")
+            sidebar = Vertical(agents_tree, health_panel, resource_panel, vulnerabilities_panel, stats_scroll, id="sidebar")
 
             content_container.mount(chat_area_container)
             content_container.mount(sidebar)
@@ -1799,6 +1876,7 @@ class ArgusStrixApp(App):
                 memory_manager=self.memory_manager,
             )
             orchestrator.load_agents()
+            self.orchestrator = orchestrator
 
             # Update agents tree - add agents ONE BY ONE as they execute
             agents_tree = self.query_one("#agents_tree", Tree)

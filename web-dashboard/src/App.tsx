@@ -1,154 +1,151 @@
-import { useBackend } from './hooks/useBackend';
-import HeaderBar from './components/HeaderBar';
-import LeftPanel from './components/LeftPanel';
-import OperationPipeline from './components/OperationPipeline';
-import AgentLog from './components/AgentLog';
-import ActivityFeed from './components/ActivityFeed';
-import AttackGraph from './components/AttackGraph';
-import KeyFindings from './components/KeyFindings';
-import RightPanel from './components/RightPanel';
-import FooterBar from './components/FooterBar';
+import { useState, useCallback } from 'react';
+import type { Toast } from './types';
 
-const S = {
-  root: {
-    width: '100vw',
-    height: '100vh',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    overflow: 'hidden',
-    background: '#080c08',
-    userSelect: 'none' as const,
-    fontFamily: "'JetBrains Mono', 'Courier New', monospace",
-  },
-  main: {
-    flex: 1,
-    display: 'flex',
-    overflow: 'hidden',
-    minHeight: 0,
-  },
-  center: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    overflow: 'hidden',
-    minWidth: 0,
-  },
-  centerBody: {
-    flex: 1,
-    display: 'flex',
-    overflow: 'hidden',
-    minHeight: 0,
-  },
-  leftCol: {
-    width: '46%',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    overflow: 'hidden',
-    borderRight: '1px solid #1a2a1a',
-  },
-  agentPanel: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    overflow: 'hidden',
-    minHeight: 0,
-    margin: '3px 3px 0 3px',
-    border: '1px solid #1e3a1e',
-    background: '#090e09',
-  },
-  activityWrap: {
-    flexShrink: 0,
-    margin: '3px 3px 3px 3px',
-    border: '1px solid #1a2a1a',
-    background: '#090e09',
-  },
-  rightCol: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    overflow: 'hidden',
-    minWidth: 0,
-  },
-  graphWrap: {
-    flex: 1,
-    overflow: 'hidden',
-    minHeight: 0,
-    margin: '3px 3px 0 0',
-    border: '1px solid #1a2a1a',
-  },
-  findingsWrap: {
-    flexShrink: 0,
-    margin: '3px 3px 3px 0',
-    border: '1px solid #1a2a1a',
-    background: '#090e09',
-  },
-};
+import { useBackend } from './hooks/useBackend';
+
+import TopBar from './components/TopBar';
+import LeftPanel from './components/LeftPanel';
+import PipelineBar from './components/PipelineBar';
+import UnifiedTimeline from './components/UnifiedTimeline';
+import ThinkingPanel from './components/ThinkingPanel';
+import RightPanel from './components/RightPanel';
+import BottomBar from './components/BottomBar';
+import ToastNotification from './components/ToastNotification';
 
 export default function App() {
-  const { state, selectedAgent, setSelectedAgent } = useBackend();
+  const sim = useBackend();
+  const [filterAgent, setFilterAgent] = useState('all');
+  const [filterSeverity, setFilterSeverity] = useState('all');
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const handlePause = useCallback((id: string) => {
+    sim.sendCommand('agent_pause', { agent_id: id });
+  }, [sim]);
+
+  const handleResume = useCallback((id: string) => {
+    sim.sendCommand('agent_resume', { agent_id: id });
+  }, [sim]);
+
+  const handleKill = useCallback((id: string) => {
+    sim.sendCommand('agent_kill', { agent_id: id });
+  }, [sim]);
+
+  const handleExport = useCallback(() => {
+    const report = {
+      target: sim.target,
+      session: sim.sessionId,
+      timestamp: new Date().toISOString(),
+      findings: sim.findings,
+      pipeline: sim.pipelineStages,
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `argus-report-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [sim.target, sim.sessionId, sim.findings, sim.pipelineStages]);
+
+  const handleCommand = useCallback((_cmd: string) => {
+    // Future: send command via WebSocket
+  }, []);
+
+  const currentAgent = sim.agents.find((a) => a.status === 'Running') || sim.agents[0];
+
+  const sessionMetrics = {
+    commandsExecuted: sim.commandCount,
+    dataCollected: sim.findings.length > 0 ? sim.findings.length : 0,
+    findings: sim.findings.length,
+    vulnerabilities: sim.findings.filter((f) => f.severity === 'HIGH' || f.severity === 'CRITICAL').length,
+    timeElapsed: sim.elapsed,
+  };
 
   return (
-    <div style={S.root}>
-      {/* CRT effects */}
-      <div className="scanlines" />
-      <div className="vignette" />
+    <div className="flex flex-col h-screen bg-zinc-950 text-zinc-300 overflow-hidden select-none">
+      <style>{`
+        @keyframes slideInRight {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: #18181b; }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+      `}</style>
 
-      {/* ── HEADER ── */}
-      <HeaderBar state={state} />
+      <ToastNotification toasts={toasts} onDismiss={dismissToast} />
+      <TopBar elapsed={sim.elapsed} sessionId={sim.sessionId} target={sim.target} />
 
-      {/* ── BODY ── */}
-      <div style={S.main}>
-
-        {/* LEFT SIDEBAR */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         <LeftPanel
-          state={state}
-          selectedAgent={selectedAgent}
-          onSelectAgent={setSelectedAgent}
+          agents={sim.agents}
+          cpu={Math.round(sim.cpu)}
+          mem={Math.round(sim.mem)}
+          net={Math.round(sim.net)}
+          tokens={sim.tokens}
+          credits={sim.credits}
+          elapsed={sim.elapsed}
+          llmModel={sim.llmModel}
+          riskProfile={sim.riskProfile}
+          maxParallel={sim.maxParallel}
+          safeMode={sim.safeMode}
+          onPause={handlePause}
+          onResume={handleResume}
+          onKill={handleKill}
         />
 
-        {/* CENTER */}
-        <div style={S.center}>
-          <OperationPipeline stages={state.pipeline} />
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <PipelineBar stages={sim.pipelineStages} />
 
-          <div style={S.centerBody}>
-            {/* Agent log + activity */}
-            <div style={S.leftCol}>
-              <div style={S.agentPanel}>
-                <AgentLog
-                  agentName={state.activeAgentName}
-                  agentTime={state.activeAgentTime}
-                  logs={state.logs}
-                  thinkingLines={state.thinkingLines}
-                  tokensUsed={state.tokensUsed}
-                />
-              </div>
-              <div style={S.activityWrap}>
-                <ActivityFeed activities={state.activities} verbosity="High" />
-              </div>
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <UnifiedTimeline
+                events={sim.timeline}
+                agentName={currentAgent?.name || 'RECON AGENT'}
+                agentStatus={currentAgent?.status || 'Running'}
+                elapsed={sim.elapsed}
+                filterAgent={filterAgent}
+                filterSeverity={filterSeverity}
+                onFilterAgentChange={setFilterAgent}
+                onFilterSeverityChange={setFilterSeverity}
+                agents={sim.agents}
+              />
             </div>
 
-            {/* Attack graph + findings */}
-            <div style={S.rightCol}>
-              <div style={S.graphWrap}>
-                <AttackGraph nodes={state.nodes} edges={state.edges} />
-              </div>
-              <div style={S.findingsWrap}>
-                <KeyFindings
-                  findings={state.findings}
-                  riskScore={state.riskScore}
-                  riskLabel={state.riskLabel}
-                />
-              </div>
-            </div>
+            <ThinkingPanel
+              agentName={currentAgent?.name || 'RECON AGENT'}
+              thought={sim.currentThought}
+              lastThought={sim.lastThought}
+              tokens={`${(sim.tokens / 1000).toFixed(1)}M`}
+            />
           </div>
         </div>
 
-        {/* RIGHT SIDEBAR */}
-        <RightPanel state={state} />
+        <RightPanel
+          target={sim.target}
+          ipAddress={sim.targetIP}
+          openPorts={sim.openPorts}
+          subdomains={sim.subdomains}
+          technologies={sim.technologiesCount}
+          attackSurface={sim.attackSurface}
+          topTech={sim.topTech}
+          recentDiscoveries={sim.recentDiscoveries}
+          findings={sim.findings}
+          metrics={sessionMetrics}
+          riskScore={sim.riskScore}
+          riskLevel={sim.riskLevel}
+          nodes={sim.graphNodes}
+          edges={sim.graphEdges}
+          onExport={handleExport}
+        />
       </div>
 
-      {/* ── FOOTER ── */}
-      <FooterBar />
+      <BottomBar onCommand={handleCommand} />
     </div>
   );
 }

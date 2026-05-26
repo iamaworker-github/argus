@@ -1,101 +1,164 @@
-import type { SystemState } from '../types';
+import type { Finding } from '../types';
+import KeyFindings from './KeyFindings';
+import AttackGraph from './AttackGraph';
+import type { GraphNode, GraphEdge } from '../types';
+
+interface SessionMetrics {
+  commandsExecuted: number;
+  dataCollected: number;
+  findings: number;
+  vulnerabilities: number;
+  timeElapsed: string;
+}
 
 interface Props {
-  state: SystemState;
+  target: string;
+  ipAddress: string;
+  openPorts: number;
+  subdomains: number;
+  technologies: number;
+  attackSurface: string;
+  topTech: string[];
+  recentDiscoveries: string[];
+  findings: Finding[];
+  metrics: SessionMetrics;
+  riskScore: number;
+  riskLevel: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  onExport: () => void;
 }
 
-function SectionHeader({ title }: { title: string }) {
+export default function RightPanel({
+  target,
+  ipAddress,
+  openPorts,
+  subdomains,
+  technologies,
+  attackSurface,
+  topTech,
+  recentDiscoveries,
+  findings,
+  metrics,
+  riskScore,
+  riskLevel,
+  nodes,
+  edges,
+  onExport,
+}: Props) {
   return (
-    <div style={{
-      color: '#3a5a3a',
-      fontSize: '8.5px',
-      letterSpacing: '0.15em',
-      padding: '5px 10px 4px',
-      borderBottom: '1px solid #1a2a1a',
-      background: '#0a0f0a',
-      flexShrink: 0,
-    }}>
-      {title}
+    <div className="w-72 shrink-0 border-l border-zinc-700 bg-zinc-950 flex flex-col overflow-hidden text-xs font-mono">
+      {/* Target Overview */}
+      <div className="px-3 py-2 border-b border-zinc-800">
+        <div className="text-zinc-500 text-[13px] uppercase tracking-widest mb-1.5">Target Overview</div>
+        <div className="space-y-0.5">
+          <Row label="Primary Target" value={target.length > 25 ? target.slice(0, 24) + '…' : target} valueClass="text-green-400" />
+          <Row label="IP Address" value={ipAddress || '—'} />
+          <Row label="Open Ports" value={openPorts > 0 ? String(openPorts) : '0'} valueClass={openPorts > 0 ? 'text-yellow-400' : 'text-zinc-600'} />
+          <Row label="Subdomains" value={String(subdomains)} valueClass={subdomains > 0 ? 'text-cyan-400' : 'text-zinc-600'} />
+          <Row label="Technologies" value={String(technologies)} valueClass={technologies > 0 ? 'text-purple-400' : 'text-zinc-600'} />
+          <Row label="Attack Surface" value={attackSurface || 'Unknown'} valueClass="text-orange-400" />
+        </div>
+      </div>
+
+      {/* Top Technologies */}
+      <div className="px-3 py-2 border-b border-zinc-800">
+        <div className="text-zinc-500 text-[13px] uppercase tracking-widest mb-1">Top Technologies</div>
+        {topTech.length > 0 ? (
+          topTech.map((t) => (
+            <div key={t} className="text-zinc-400 text-[13px]">{t}</div>
+          ))
+        ) : (
+          <div className="text-zinc-600 text-[13px] italic">No technologies detected</div>
+        )}
+      </div>
+
+      {/* Recent Discoveries — grows when Attack Graph is collapsed */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2 border-b border-zinc-800">
+        <div className="text-zinc-500 text-[13px] uppercase tracking-widest mb-1">Recent Discoveries</div>
+        {recentDiscoveries.length > 0 ? (
+          recentDiscoveries.map((d, i) => (
+            <div key={i} className="text-zinc-400 text-[13px] truncate">• {d}</div>
+          ))
+        ) : (
+          <div className="text-zinc-600 text-[13px] italic">None yet</div>
+        )}
+      </div>
+
+      {/* Attack Graph — no fixed height, collapses to just header */}
+      <div className="border-b border-zinc-800 shrink-0">
+        <AttackGraph nodes={nodes} edges={edges} />
+      </div>
+
+      {/* Key Findings + Export */}
+      <div className="min-h-0 border-b border-zinc-800 overflow-hidden flex flex-col" style={{ maxHeight: '160px' }}>
+        <KeyFindings findings={findings} onExport={onExport} />
+      </div>
+
+      {/* Session Metrics — FIX: show real data, hide zeros for commands/data */}
+      <div className="px-3 py-2 border-b border-zinc-800">
+        <div className="text-zinc-500 text-[13px] uppercase tracking-widest mb-1">Session Metrics</div>
+        <div className="space-y-0.5">
+          {/* FIX: Hide zeros for commands/data if not yet collected */}
+          <MetricRow
+            label="Commands Executed"
+            value={metrics.commandsExecuted > 0 ? String(metrics.commandsExecuted) : '—'}
+            valueClass={metrics.commandsExecuted > 0 ? 'text-zinc-300' : 'text-zinc-700'}
+          />
+          <MetricRow
+            label="Data Collected"
+            value={metrics.dataCollected > 0 ? `${metrics.dataCollected} MB` : '—'}
+            valueClass={metrics.dataCollected > 0 ? 'text-zinc-300' : 'text-zinc-700'}
+          />
+          <MetricRow
+            label="Findings"
+            value={String(metrics.findings)}
+            valueClass={metrics.findings > 0 ? 'text-yellow-400' : 'text-zinc-600'}
+          />
+          <MetricRow
+            label="Vulnerabilities"
+            value={String(metrics.vulnerabilities)}
+            valueClass={metrics.vulnerabilities > 0 ? 'text-red-400' : 'text-zinc-600'}
+          />
+          <MetricRow label="Time Elapsed" value={metrics.timeElapsed} valueClass="text-zinc-300" />
+        </div>
+      </div>
+
+      {/* Risk Score */}
+      <div className="px-3 py-2">
+        <div className="text-zinc-500 text-[13px] uppercase tracking-widest mb-1">Risk Score</div>
+        <div className="text-2xl font-bold text-yellow-400">{riskScore.toFixed(1)}</div>
+        <div className="text-zinc-500 text-[13px]">{riskLevel}</div>
+        <div className="flex gap-0.5 mt-1">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div
+              key={i}
+              className="flex-1 h-1 rounded-sm"
+              style={{
+                backgroundColor: i < Math.round(riskScore / 10) ? '#facc15' : '#27272a',
+              }}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
-function MetaRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+function Row({ label, value, valueClass = 'text-zinc-400' }: { label: string; value: string; valueClass?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2px 0' }}>
-      <span style={{ color: '#3a5a3a', fontSize: '8.5px', letterSpacing: '0.04em' }}>{label}</span>
-      <span style={{ color: valueColor || '#8ab88a', fontSize: '9px', fontVariantNumeric: 'tabular-nums' }}>{value}</span>
+    <div className="flex justify-between items-center gap-1">
+      <span className="text-zinc-600 text-[12px]">{label}</span>
+      <span className={`text-[12px] font-bold ${valueClass} truncate max-w-[6rem] text-right`}>{value}</span>
     </div>
   );
 }
 
-export default function RightPanel({ state }: Props) {
+function MetricRow({ label, value, valueClass = 'text-zinc-400' }: { label: string; value: string; valueClass?: string }) {
   return (
-    <div style={{
-      width: '190px',
-      minWidth: '190px',
-      borderLeft: '1px solid #1a2a1a',
-      display: 'flex',
-      flexDirection: 'column',
-      overflowY: 'auto',
-      height: '100%',
-      background: '#090d09',
-    }}>
-
-      {/* ── Target Overview ── */}
-      <SectionHeader title="TARGET OVERVIEW" />
-      <div style={{ padding: '8px 10px', borderBottom: '1px solid #1a2a1a', flexShrink: 0 }}>
-        <div style={{ marginBottom: '6px' }}>
-          <div style={{ color: '#3a5a3a', fontSize: '7.5px', letterSpacing: '0.1em', marginBottom: '2px' }}>Primary Target</div>
-          <div style={{ color: '#00ff88', fontSize: '12px', fontWeight: 700, textShadow: '0 0 8px rgba(0,255,136,0.3)' }}>
-            {state.target}
-          </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <MetaRow label="IP Address" value={state.targetIP} />
-          <MetaRow label="Open Ports" value={String(state.openPorts)} />
-          <MetaRow label="Subdomains" value={String(state.subdomains)} />
-          <MetaRow label="Technologies" value={String(state.technologies_count)} />
-          <MetaRow label="Attack Surface" value={state.attackSurface} valueColor="#f0a500" />
-        </div>
-      </div>
-
-      {/* ── Top Technologies ── */}
-      <SectionHeader title="TOP TECHNOLOGIES" />
-      <div style={{ padding: '6px 10px', borderBottom: '1px solid #1a2a1a', flexShrink: 0 }}>
-        {state.technologies.map((tech, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '3px 0' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '9px' }}>{tech.icon}</span>
-              <span style={{ color: '#8ab88a', fontSize: '9px' }}>{tech.name}</span>
-            </div>
-            <span style={{ color: '#3a5a3a', fontSize: '8.5px' }}>{tech.percent}%</span>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Recent Discoveries ── */}
-      <SectionHeader title="RECENT DISCOVERIES" />
-      <div style={{ padding: '6px 10px', borderBottom: '1px solid #1a2a1a', flexShrink: 0 }}>
-        {state.discoveries.slice(-5).map((d, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '2.5px 0' }}>
-            <span style={{ color: '#6a9a6a', fontSize: '9px' }}>{d.name}</span>
-            <span style={{ color: '#2a4a2a', fontSize: '8px', fontVariantNumeric: 'tabular-nums' }}>{d.time}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Session Metrics ── */}
-      <SectionHeader title="SESSION METRICS" />
-      <div style={{ padding: '6px 10px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-          <MetaRow label="Commands Executed" value={String(state.commandsExecuted)} />
-          <MetaRow label="Data Collected" value={state.dataCollected} />
-          <MetaRow label="Findings" value={String(state.findingsCount)} />
-          <MetaRow label="Vulnerabilities" value={String(state.vulnerabilities)} />
-          <MetaRow label="Time Elapsed" value={state.time} />
-        </div>
-      </div>
+    <div className="flex justify-between items-center">
+      <span className="text-zinc-600 text-[12px]">{label}</span>
+      <span className={`text-[13px] font-bold ${valueClass}`}>{value}</span>
     </div>
   );
 }

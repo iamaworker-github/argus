@@ -562,6 +562,7 @@ async def run_scan(
     checkpoint: bool = False,
     event_bus=None,
     _from_web: bool = False,
+    _orchestrator_hook=None,
 ):
     """Run security scan - Strix-compatible with telemetry."""
     from argus.core.telemetry import get_tracer, trace
@@ -599,6 +600,10 @@ async def run_scan(
             akto_api_key=akto_api_key,
         )
         orchestrator.load_agents()
+
+        # Pass orchestrator reference to web server for pause/kill
+        if _orchestrator_hook:
+            _orchestrator_hook(orchestrator)
 
         # Run scan
         if parallel:

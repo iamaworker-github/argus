@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { GraphNode, GraphEdge } from '../types';
 
 interface Props {
@@ -5,189 +6,152 @@ interface Props {
   edges: GraphEdge[];
 }
 
-const TYPE_COLORS: Record<string, string> = {
-  host: '#00ff88',
-  service: '#3b82f6',
-  application: '#a855f7',
-  datastore: '#f59e0b',
-  external: '#6b7280',
+const nodeColors: Record<string, { fill: string; stroke: string; text: string }> = {
+  Host: { fill: '#1e3a2f', stroke: '#4ade80', text: '#4ade80' },
+  Service: { fill: '#1e2a3a', stroke: '#60a5fa', text: '#60a5fa' },
+  Application: { fill: '#2a1e3a', stroke: '#c084fc', text: '#c084fc' },
+  DataStore: { fill: '#3a2a1e', stroke: '#fb923c', text: '#fb923c' },
+  External: { fill: '#3a1e1e', stroke: '#f87171', text: '#f87171' },
 };
 
-const TYPE_ICONS: Record<string, string> = {
-  host: '🌐',
-  service: '⬡',
-  application: '▣',
-  datastore: '🗄',
-  external: '☁',
+const stateOpacity: Record<string, number> = {
+  discovered: 1,
+  pending: 0.45,
+  compromised: 1,
+  safe: 0.7,
 };
 
-const LEGEND_ITEMS = [
-  { label: 'Host', color: '#00ff88' },
-  { label: 'Service', color: '#3b82f6' },
-  { label: 'Application', color: '#a855f7' },
-  { label: 'Data Store', color: '#f59e0b' },
-  { label: 'External', color: '#6b7280' },
+const typeLegend = [
+  { label: 'Host', color: '#4ade80' },
+  { label: 'Service', color: '#60a5fa' },
+  { label: 'Application', color: '#c084fc' },
+  { label: 'DataStore', color: '#fb923c' },
+  { label: 'External', color: '#f87171' },
 ];
 
-interface NodeProps {
-  node: GraphNode;
-  svgW: number;
-  svgH: number;
-}
-
-function GraphNodeBox({ node, svgW, svgH }: NodeProps) {
-  const cx = (node.x / 100) * svgW;
-  const cy = (node.y / 100) * svgH;
-  const color = TYPE_COLORS[node.type] || '#6b7280';
-  const w = 78;
-  const h = node.sublabel ? 28 : 20;
-
-  return (
-    <g>
-      {/* Glow effect for host node */}
-      {node.type === 'host' && (
-        <rect
-          x={cx - w / 2 - 2} y={cy - h / 2 - 2}
-          width={w + 4} height={h + 4}
-          rx={3} fill="none"
-          stroke={color} strokeWidth={0.5}
-          opacity={0.3}
-        />
-      )}
-      {/* Main box */}
-      <rect
-        x={cx - w / 2} y={cy - h / 2}
-        width={w} height={h}
-        rx={2}
-        fill="#0c140c"
-        stroke={color}
-        strokeWidth={node.type === 'host' ? 1.5 : 1}
-        opacity={0.95}
-      />
-      {/* Icon background */}
-      <rect
-        x={cx - w / 2} y={cy - h / 2}
-        width={16} height={h}
-        rx={2}
-        fill={color}
-        opacity={0.12}
-      />
-      {/* Icon */}
-      <text
-        x={cx - w / 2 + 8} y={cy + 4}
-        fill={color}
-        fontSize={8}
-        textAnchor="middle"
-        fontFamily="monospace"
-      >
-        {TYPE_ICONS[node.type] || '?'}
-      </text>
-      {/* Label */}
-      <text
-        x={cx - w / 2 + 21} y={node.sublabel ? cy - 3 : cy + 4}
-        fill="#c8e6c8"
-        fontSize={node.type === 'host' ? 8.5 : 7.5}
-        fontFamily="JetBrains Mono, monospace"
-        fontWeight={node.type === 'host' ? 700 : 500}
-      >
-        {node.label}
-      </text>
-      {node.sublabel && (
-        <text
-          x={cx - w / 2 + 21} y={cy + 9}
-          fill={color}
-          fontSize={6.5}
-          fontFamily="JetBrains Mono, monospace"
-          opacity={0.85}
-        >
-          {node.sublabel}
-        </text>
-      )}
-    </g>
-  );
-}
-
 export default function AttackGraph({ nodes, edges }: Props) {
-  const svgW = 420;
-  const svgH = 290;
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const W = 100;
+  const H = 100;
 
-  const getCenter = (id: string) => {
-    const n = nodes.find(n => n.id === id);
-    if (!n) return { x: 0, y: 0 };
-    return { x: (n.x / 100) * svgW, y: (n.y / 100) * svgH };
-  };
+  const getNode = (id: string) => nodes.find((n) => n.id === id);
 
   return (
-    <div className="panel flex flex-col h-full overflow-hidden" style={{ background: '#090d09' }}>
-      <div className="px-3 py-1 flex-shrink-0" style={{ borderBottom: '1px solid #1a2a1a' }}>
-        <span className="panel-title">ATTACK GRAPH</span>
+    <div className={`flex flex-col ${isCollapsed ? '' : 'h-40'}`}>
+      <div
+        className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-700 shrink-0 cursor-pointer hover:bg-zinc-900"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        <span className="text-zinc-400 font-mono text-[12px] font-bold uppercase tracking-widest">Attack Graph</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-green-400 font-mono text-[13px]">LIVE</span>
+          </div>
+          <span className="text-zinc-500 text-[12px] font-mono">{isCollapsed ? '▶' : '▼'}</span>
+        </div>
       </div>
-      <div className="flex-1 overflow-hidden" style={{ minHeight: 0 }}>
+
+      {!isCollapsed && (
+      <div className="flex-1 relative overflow-hidden bg-zinc-950 p-1 min-h-0">
         <svg
-          viewBox={`0 0 ${svgW} ${svgH}`}
-          width="100%"
-          height="100%"
-          style={{ display: 'block', background: '#090d09' }}
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full h-full"
           preserveAspectRatio="xMidYMid meet"
         >
+          {/* Grid lines */}
           <defs>
-            {/* Grid pattern */}
-            <pattern id="smallgrid" width="10" height="10" patternUnits="userSpaceOnUse">
-              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#0e1a0e" strokeWidth="0.4"/>
+            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#27272a" strokeWidth="0.2" />
             </pattern>
-            <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-              <rect width="50" height="50" fill="url(#smallgrid)"/>
-              <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#111a11" strokeWidth="0.8"/>
-            </pattern>
-            {/* Arrow markers */}
-            <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L7,3 z" fill="#1e3a1e" />
-            </marker>
-            <marker id="arrowhead-active" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-              <path d="M0,0 L0,6 L7,3 z" fill="#2a5a3a" />
-            </marker>
           </defs>
-
-          {/* Background */}
-          <rect width={svgW} height={svgH} fill="url(#grid)" />
+          <rect width="100" height="100" fill="url(#grid)" />
 
           {/* Edges */}
           {edges.map((edge, i) => {
-            const from = getCenter(edge.from);
-            const to = getCenter(edge.to);
-            const fromNode = nodes.find(n => n.id === edge.from);
-            const toNode = nodes.find(n => n.id === edge.to);
-            const isActive = fromNode?.type === 'host' || toNode?.type === 'host';
-
+            const from = getNode(edge.from);
+            const to = getNode(edge.to);
+            if (!from || !to) return null;
             return (
               <line
                 key={i}
-                x1={from.x} y1={from.y + 14}
-                x2={to.x} y2={to.y - 14}
-                stroke={isActive ? '#1e4a2e' : '#162816'}
-                strokeWidth={isActive ? 1.2 : 0.8}
-                strokeDasharray={isActive ? 'none' : '3,2'}
-                markerEnd={`url(#${isActive ? 'arrowhead-active' : 'arrowhead'})`}
-                opacity={0.8}
+                x1={from.x}
+                y1={from.y}
+                x2={to.x}
+                y2={to.y}
+                stroke="#3f3f46"
+                strokeWidth="0.5"
+                strokeDasharray={to.state === 'pending' ? '2 1' : undefined}
               />
             );
           })}
 
           {/* Nodes */}
-          {nodes.map(node => (
-            <GraphNodeBox key={node.id} node={node} svgW={svgW} svgH={svgH} />
-          ))}
+          {nodes.map((node) => {
+            const cfg = nodeColors[node.type];
+            const opacity = stateOpacity[node.state];
+            const isPending = node.state === 'pending';
+            return (
+              <g key={node.id} opacity={opacity}>
+                {/* Glow for discovered */}
+                {node.state === 'discovered' && (
+                  <circle cx={node.x} cy={node.y} r="5" fill={cfg.stroke} opacity="0.15" />
+                )}
+                <circle
+                  cx={node.x}
+                  cy={node.y}
+                  r="3.5"
+                  fill={cfg.fill}
+                  stroke={cfg.stroke}
+                  strokeWidth={isPending ? '0.4' : '0.8'}
+                  strokeDasharray={isPending ? '1.5 0.8' : undefined}
+                />
+                {/* Node type icon */}
+                <text
+                  x={node.x}
+                  y={node.y + 0.8}
+                  textAnchor="middle"
+                  fontSize="3"
+                  fill={cfg.text}
+                >
+                  {node.type === 'Host' ? '⬡' : node.type === 'Service' ? '◈' : node.type === 'Application' ? '◉' : node.type === 'DataStore' ? '▣' : '◆'}
+                </text>
+                {/* Label */}
+                <text
+                  x={node.x}
+                  y={node.y + 7}
+                  textAnchor="middle"
+                  fontSize="2.2"
+                  fill={isPending ? '#52525b' : cfg.text}
+                >
+                  {node.label.length > 25 ? node.label.slice(0, 24) + '…' : node.label}
+                </text>
+                {/* Pending badge */}
+                {isPending && (
+                  <text x={node.x} y={node.y - 5} textAnchor="middle" fontSize="1.8" fill="#6b7280">
+                    pending
+                  </text>
+                )}
+              </g>
+            );
+          })}
         </svg>
-      </div>
-      {/* Legend */}
-      <div className="flex items-center gap-3 px-3 py-1 flex-shrink-0" style={{ borderTop: '1px solid #1a2a1a' }}>
-        {LEGEND_ITEMS.map(item => (
-          <div key={item.label} className="flex items-center gap-1">
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: item.color }} />
-            <span style={{ color: '#3a5a3a', fontSize: '7.5px' }}>{item.label}</span>
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-x-2 gap-y-0.5 px-2 py-1 border-t border-zinc-800 bg-zinc-950">
+          {typeLegend.map((l) => (
+            <div key={l.label} className="flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: l.color }} />
+              <span className="text-[12px] font-mono" style={{ color: l.color }}>{l.label}</span>
+            </div>
+          ))}
+          <div className="flex items-center gap-1 ml-2">
+            <div className="w-3 h-px border-t border-dashed border-zinc-600" />
+            <span className="text-[12px] font-mono text-zinc-600">pending</span>
           </div>
-        ))}
+        </div>
       </div>
+      )}
     </div>
   );
 }

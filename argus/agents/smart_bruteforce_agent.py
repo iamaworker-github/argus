@@ -58,6 +58,10 @@ class SmartBruteforceAgent(BaseAgent):
 
         async with httpx.AsyncClient(timeout=8, follow_redirects=False) as client:
             for base_url in targets_to_scan:
+                if self.should_stop:
+                    logger.info(f"{self.name}: Cancelled during bruteforce")
+                    break
+                await self.check_pause()
                 await self._bruteforce(client, base_url, scan_paths)
 
         return AgentResult(
@@ -143,6 +147,10 @@ class SmartBruteforceAgent(BaseAgent):
     async def _bruteforce(self, client: httpx.AsyncClient, base_url: str, wordlist: List[str]) -> None:
         header = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         for path in wordlist:
+            if self.should_stop:
+                logger.info(f"{self.name}: Cancelled mid-bruteforce")
+                break
+            await self.check_pause()
             try:
                 url = f"{base_url.rstrip('/')}{path}"
                 resp = await client.get(url, headers=header, timeout=5)

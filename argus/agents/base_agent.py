@@ -159,6 +159,42 @@ class BaseAgent(ABC):
         # Track pending async tasks for proper cleanup
         self._pending_tasks: List[asyncio.Task] = []
 
+        # Cancellation support (set by orchestrator)
+        self._cancelled: bool = False
+        self._paused: bool = False
+        self._paused_event: asyncio.Event = asyncio.Event()
+        self._paused_event.set()
+
+    def cancel(self) -> None:
+        """Signal the agent to stop at the next safe checkpoint."""
+        self._cancelled = True
+        self._paused_event.set()
+        logger.info(f"{self.name}: Cancel signal received")
+
+    def pause(self) -> None:
+        """Pause the agent at the next checkpoint."""
+        self._paused = True
+        self._paused_event.clear()
+        logger.info(f"{self.name}: Pause signal received")
+
+    def resume(self) -> None:
+        """Resume the agent from pause."""
+        self._paused = False
+        self._paused_event.set()
+        logger.info(f"{self.name}: Resume signal received")
+
+    @property
+    def should_stop(self) -> bool:
+        """Check if a cancel signal has been sent."""
+        return self._cancelled
+
+    async def check_pause(self) -> None:
+        """If paused, wait until resumed. Does nothing when not paused."""
+        if self._paused:
+            logger.debug(f"{self.name}: Paused, waiting for resume...")
+            await self._paused_event.wait()
+            logger.debug(f"{self.name}: Resumed")
+
     def set_shared_browser(self, browser: BrowserAutomation) -> None:
         """Set shared browser instance (Strix v0.6.2 style)."""
         self._shared_browser = browser
@@ -244,6 +280,18 @@ class BaseAgent(ABC):
         try:
             # Initialize toolkit
             await self.initialize_toolkit()
+
+            if self.should_stop:
+                logger.info(f"{self.name}: Cancelled before execution")
+                self.status = AgentStatus.FAILED
+                self.end_time = asyncio.get_event_loop().time()
+                return AgentResult(
+                    agent_name=self.name,
+                    status=AgentStatus.FAILED,
+                    findings=self.findings,
+                    execution_time=0,
+                    error="Cancelled before execution",
+                )
 
             # Execute agent logic
             result = await self.execute()

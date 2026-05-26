@@ -21,8 +21,12 @@ from pydantic import BaseModel
 from argus.core.logger import get_logger
 from argus.core.event_bus import get_event_bus
 from argus.core.di_container import get_container
+from argus.agents.orchestrator import AgentOrchestrator
 
 logger = get_logger()
+
+# Current orchestrator reference for pause/kill
+_current_orchestrator: Optional['AgentOrchestrator'] = None
 
 DASHBOARD_DIR = Path(__file__).resolve().parent.parent / "web-dashboard" / "dist"
 
@@ -45,6 +49,7 @@ class DashboardState:
             "maxTokens": 2000000,
             "credits": 5000,
             "uptime": "00:00:00",
+            "llmModel": "",
             "sessionId": "",
             "time": "00:00:00",
             "target": "",
@@ -119,28 +124,86 @@ def setup_event_subscriptions():
 
     @bus.subscribe("agent.started")
     async def on_agent_started(event):
+        agents = dashboard_state.state.get("agents", [])
+        now = datetime.now().strftime("%H:%M:%S")
+        if not any(a.get("name") == event.agent_name for a in agents):
+            agents.append({
+                "name": event.agent_name,
+                "id": event.agent_name.lower().replace(" ", "_"),
+                "status": "running",
+                "progress": 0,
+                "findings": 0,
+            })
+        logs = dashboard_state.state.get("logs", [])
+        logs.append({"text": f"Agent started: {event.agent_name}", "type": "info", "timestamp": now, "agent_name": event.agent_name})
+        activities = dashboard_state.state.get("activities", [])
+        activities.append({"time": now, "agent": event.agent_name, "message": "Agent started"})
         dashboard_state.update({
             "activeAgentName": event.agent_name.upper(),
             "activeAgentTime": "00:00:00",
             "agentStatus": "EXECUTING",
+            "agents": agents[-20:],
+            "logs": logs[-50:],
+            "activities": activities[-30:],
         })
         await broadcast_state()
 
     @bus.subscribe("agent.completed")
     async def on_agent_completed(event):
-        dashboard_state.update({"agentStatus": "IDLE"})
+        agents = dashboard_state.state.get("agents", [])
+        now = datetime.now().strftime("%H:%M:%S")
+        for a in agents:
+            if a["name"] == event.agent_name:
+                a["status"] = "completed"
+                a["progress"] = 100
+        logs = dashboard_state.state.get("logs", [])
+        logs.append({"text": f"Agent completed: {event.agent_name} ({event.findings_count} findings)", "type": "success", "timestamp": now, "agent_name": event.agent_name})
+        activities = dashboard_state.state.get("activities", [])
+        activities.append({"time": now, "agent": event.agent_name, "message": f"Agent completed — {event.findings_count} findings"})
+        dashboard_state.update({
+            "agentStatus": "IDLE",
+            "agents": agents,
+            "logs": logs[-50:],
+            "activities": activities[-30:],
+        })
+        await broadcast_state()
+
+    @bus.subscribe("agent.failed")
+    async def on_agent_failed(event):
+        agents = dashboard_state.state.get("agents", [])
+        now = datetime.now().strftime("%H:%M:%S")
+        for a in agents:
+            if a["name"] == event.agent_name:
+                a["status"] = "error"
+        logs = dashboard_state.state.get("logs", [])
+        logs.append({"text": f"Agent failed: {event.agent_name} — {event.error_message}", "type": "error", "timestamp": now, "agent_name": event.agent_name})
+        activities = dashboard_state.state.get("activities", [])
+        activities.append({"time": now, "agent": event.agent_name, "message": f"Agent failed: {event.error_message}"})
+        dashboard_state.update({
+            "agentStatus": "ERROR",
+            "agents": agents,
+            "logs": logs[-50:],
+            "activities": activities[-30:],
+        })
         await broadcast_state()
 
     @bus.subscribe("agent.thinking")
     async def on_agent_thinking(event):
         lines = dashboard_state.state.get("thinkingLines", [])
         lines = lines[-9:] + [f"> {event.thought}"]
-        dashboard_state.update({"thinkingLines": lines})
+        now = datetime.now().strftime("%H:%M:%S")
+        logs = dashboard_state.state.get("logs", [])
+        logs.append({"text": f"[{event.agent_name}] {event.thought}", "type": "thinking", "timestamp": now, "agent_name": event.agent_name})
+        dashboard_state.update({
+            "thinkingLines": lines,
+            "logs": logs[-50:],
+        })
         await broadcast_state()
 
     @bus.subscribe("finding.discovered")
     async def on_finding(event):
         findings = dashboard_state.state.get("findings", [])
+        now = datetime.now().strftime("%H:%M:%S")
         findings = findings[-19:] + [{
             "text": event.title,
             "title": event.title,
@@ -152,16 +215,38 @@ def setup_event_subscriptions():
             "cvss_score": event.cvss_score,
             "cwe_id": event.cwe_id,
             "remediation": event.remediation,
+            "agent_name": event.agent_name,
         }]
         findings_count = dashboard_state.state.get("findingsCount", 0) + 1
-        dashboard_state.update({"findings": findings, "findingsCount": findings_count})
+        agents = dashboard_state.state.get("agents", [])
+        for a in agents:
+            if a["name"] == event.agent_name:
+                a["findings"] = a.get("findings", 0) + 1
+        logs = dashboard_state.state.get("logs", [])
+        logs.append({"text": f"Finding: {event.title} [{event.severity.upper()}]", "type": "warning", "timestamp": now, "agent_name": event.agent_name})
+        dashboard_state.update({
+            "findings": findings,
+            "findingsCount": findings_count,
+            "agents": agents,
+            "logs": logs[-50:],
+        })
         await broadcast_state()
 
     @bus.subscribe("agent.progress")
     async def on_agent_progress(event):
+        agents = dashboard_state.state.get("agents", [])
+        now = datetime.now().strftime("%H:%M:%S")
+        for a in agents:
+            if a["name"] == event.agent_name:
+                a["progress"] = max(a.get("progress", 0), int(event.progress))
+        logs = dashboard_state.state.get("logs", [])
+        if event.message:
+            logs.append({"text": f"[{event.agent_name}] {event.message}", "type": "info", "timestamp": now, "agent_name": event.agent_name})
         dashboard_state.update({
             "commandsExecuted": dashboard_state.state.get("commandsExecuted", 0) + 1,
             "dataCollected": f"{float(dashboard_state.state.get('dataCollected', '0').split()[0]) + 0.1:.1f} MB",
+            "agents": agents,
+            "logs": logs[-50:],
         })
         await broadcast_state()
 
@@ -181,28 +266,56 @@ async def broadcast_state():
 
 
 async def _health_tick():
-    """Periodically update system health metrics."""
-    import math, random, psutil
-    tick = 0
+    """Periodically update system health metrics — live data."""
+    import psutil
+    from argus.agents.llm_client import get_cost_tracker, LLMClient
+    from argus.core.config import get_config
+
+    _prev_net = psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv
+    _prev_time = time.monotonic()
+
     while True:
         await asyncio.sleep(2)
-        tick += 1
         try:
             cpu = psutil.cpu_percent(interval=None)
             mem = psutil.virtual_memory().percent
         except Exception:
-            cpu = 15 + math.sin(tick * 0.08) * 10 + random.random() * 15
-            mem = 35 + math.sin(tick * 0.03) * 8 + random.random() * 8
-        net = 5 + abs(math.sin(tick * 0.15)) * 20 + random.random() * 10
+            cpu = 0
+            mem = 0
+
+        # Real network I/O rate
+        try:
+            now = time.monotonic()
+            cur = psutil.net_io_counters().bytes_sent + psutil.net_io_counters().bytes_recv
+            elapsed = now - _prev_time
+            net_rate = int((cur - _prev_net) / elapsed) if elapsed > 0 else 0
+            _prev_net = cur
+            _prev_time = now
+        except Exception:
+            net_rate = 0
+
+        # Real token usage from CostTracker
+        try:
+            tokens = get_cost_tracker().total_tokens
+        except Exception:
+            tokens = dashboard_state.state.get("tokens", 0)
+
+        # LLM status
+        try:
+            cfg = get_config()
+            if cfg.has_ai_enabled:
+                llm_model = LLMClient().model
+            else:
+                llm_model = "AI OFF"
+        except Exception:
+            llm_model = "AI OFF"
 
         dashboard_state.update({
             "cpu": round(cpu, 1),
             "mem": round(mem, 1),
-            "net": round(net, 1),
-            "tokens": min(
-                dashboard_state.state.get("maxTokens", 2000000),
-                dashboard_state.state.get("tokens", 0) + random.randint(100, 4000)
-            ),
+            "net": net_rate,
+            "tokens": tokens,
+            "llmModel": llm_model,
         })
         if dashboard_state.clients:
             await broadcast_state()
@@ -259,10 +372,15 @@ async def start_scan(req: ScanRequest):
 
 
 async def _run_scan_task(target: str, mode: str, session_id: str):
+    global _current_orchestrator
     try:
         from argus.core.config import set_config
         from argus.cli import run_scan as _run_scan
         set_config(verbose=False, output_dir=Path("./argus_results"))
+
+        def _store_orchestrator(orch):
+            global _current_orchestrator
+            _current_orchestrator = orch
 
         result = await _run_scan(
             target=target,
@@ -272,6 +390,7 @@ async def _run_scan_task(target: str, mode: str, session_id: str):
             mode=mode,
             event_bus=get_event_bus(),
             _from_web=True,
+            _orchestrator_hook=_store_orchestrator,
         )
 
         findings_count = getattr(result, 'total_findings', 0)
@@ -305,7 +424,7 @@ async def _run_scan_task(target: str, mode: str, session_id: str):
         activities = []
         for ar in agent_results:
             agent_name = getattr(ar, "agent_name", "unknown")
-            logs.append({"text": f"Agent {agent_name} completed — {len(getattr(ar, 'findings', []))} findings", "type": "info"})
+            logs.append({"text": f"Agent {agent_name} completed — {len(getattr(ar, 'findings', []))} findings", "type": "info", "agent_name": agent_name})
             activities.append({"time": datetime.now().strftime("%H:%M:%S"), "agent": agent_name, "message": f"Agent completed with {len(getattr(ar, 'findings', []))} findings"})
 
             for f in getattr(ar, "findings", []):
@@ -331,6 +450,9 @@ async def _run_scan_task(target: str, mode: str, session_id: str):
         traceback.print_exc()
         dashboard_state.update({"agentStatus": "IDLE"})
         await broadcast_state()
+    finally:
+        global _current_orchestrator
+        _current_orchestrator = None
 
 
 @app.get("/api/scans")
@@ -358,6 +480,45 @@ async def websocket_endpoint(websocket: WebSocket):
                 msg = json.loads(data)
                 if msg.get("type") == "ping":
                     await websocket.send_text(json.dumps({"type": "pong"}))
+                elif msg.get("type") == "agent_pause":
+                    agent_id = msg.get("payload", {}).get("agent_id", "")
+                    agents = dashboard_state.state.get("agents", [])
+                    matched_name = None
+                    for a in agents:
+                        if a.get("id") == agent_id or a.get("name", "").lower().replace(" ", "_") == agent_id:
+                            a["status"] = "paused"
+                            matched_name = a.get("name", "")
+                            logger.info(f"Agent paused: {matched_name}")
+                    dashboard_state.update({"agents": agents})
+                    if matched_name and _current_orchestrator:
+                        _current_orchestrator.pause_agent(matched_name)
+                    await broadcast_state()
+                elif msg.get("type") == "agent_resume":
+                    agent_id = msg.get("payload", {}).get("agent_id", "")
+                    agents = dashboard_state.state.get("agents", [])
+                    matched_name = None
+                    for a in agents:
+                        if a.get("id") == agent_id or a.get("name", "").lower().replace(" ", "_") == agent_id:
+                            a["status"] = "running"
+                            matched_name = a.get("name", "")
+                            logger.info(f"Agent resumed: {matched_name}")
+                    dashboard_state.update({"agents": agents})
+                    if matched_name and _current_orchestrator:
+                        _current_orchestrator.resume_agent(matched_name)
+                    await broadcast_state()
+                elif msg.get("type") == "agent_kill":
+                    agent_id = msg.get("payload", {}).get("agent_id", "")
+                    agents = dashboard_state.state.get("agents", [])
+                    matched_name = None
+                    for a in agents:
+                        if a.get("id") == agent_id or a.get("name", "").lower().replace(" ", "_") == agent_id:
+                            a["status"] = "killed"
+                            matched_name = a.get("name", "")
+                            logger.info(f"Agent killed: {matched_name}")
+                    dashboard_state.update({"agents": agents})
+                    if matched_name and _current_orchestrator:
+                        _current_orchestrator.cancel_agent(matched_name)
+                    await broadcast_state()
             except asyncio.TimeoutError:
                 await websocket.send_text(json.dumps({"type": "ping"}))
     except WebSocketDisconnect:
