@@ -1,210 +1,221 @@
-# Argus - AI-Powered Autonomous Pentest Platform
+# Argus — AI-Powered Autonomous Pentest Platform
 
 ```
      █████╗ ██████╗  ██████╗ ██╗   ██╗███████╗
     ██╔══██╗██╔══██╗██╔════╝ ██║   ██║██╔════╝
     ███████║██████╔╝██║  ███╗██║   ██║███████╗
-    ██╔══██║██╔══██╗██║   ██║██║   ██║╚════██║
+    ██╔══██║██║══██╗██║   ██║██║   ██║╚════██║
     ██║  ██║██║  ██║╚██████╔╝╚██████╔╝███████║
     ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝  ╚═════╝ ╚══════╝
 ```
 
 > **See Everything. Miss Nothing.**
-> AI-powered autonomous security testing platform — **80+ integrated tools, 30+ specialized agents**
+> Argus is an AI-powered autonomous security testing platform with 30+ specialized agents, 80+ integrated tools, and self-learning capabilities. It plans, executes, and learns from security assessments — no manual configuration needed.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker)]()
-[![Tools](https://img.shields.io/badge/Tools-80%2B-00FF88.svg)]()
+[![Docker](https://img.shields.io/badge/Docker-Pull-2496ED.svg?logo=docker)](https://hub.docker.com/r/iamaworker135/argus)
+[![GitHub](https://img.shields.io/badge/GitHub-Repo-181717.svg?logo=github)](https://github.com/iamaworker-github/argus)
 
-## Pipeline
-
-```
-AI Planning ──► Reconnaissance ──► Enumeration ──► Vulnerability ──► AI Analysis ──► Exploitation ──► Reporting
-     │                │                  │                │                │                 │               │
-  LLM target      WAF detect        BackMeUp         21 web vuln      AI prioritizes    Auto-exploit    Markdown/
-  analysis        httpx -td         SmartBruteForce  agents + nuclei  + false-pos        with PoC        J/JSON/HTML
-  plan gen        nmap -p-          svc enum -sV -sC  validate (curl)  reduce + skill    propagation     dashboard
-```
-
-### Phase Details
-
-| Phase | Agents | Description |
-|---|---|---|
-| **1. AI Planning** | PlanAgent | LLM analyzes target, generates attack plan, selects agents |
-| **2. Reconnaissance** | WAFDetectionAgent, ReconAgent, NucleiAgent | WAF detection, httpx tech detection (-td), nmap all-ports (-p-), nuclei templates |
-| **3. Enumeration** | BackMeUpAgent, SmartBruteForceAgent, service enum | URL harvesting (gau/katana/waybackurls), path bruteforce, nmap -sV -sC on open ports |
-| **4. Vulnerability** | 21 specialized agents + PoCValidatorAgent | SQLi, XSS, SSRF, CSRF, SSTI, JWT, IDOR, LFI, RCE, CORS, XXE, clickjacking, open redirect, host header injection, rate limiting, NoSQL injection + curl PoC validation |
-| **5. AI Analysis** | AnalysisAgent | Cross-correlates findings, deduplicates, false-positive reduction, auto-learns skills from H1 disclosures |
-| **6. Exploitation** | ExploitationAgent | Auto-exploitation with auth context, credential propagation |
-| **7. Reporting** | ReportAgent | Professional markdown/JSON/HTML reports with proof snippets |
+---
 
 ## Features
 
-### Core
-- **7-Stage Pipeline**: AI Planning → Recon → Enumeration → Vulnerability → AI Analysis → Exploitation → Reporting
-- **30+ Specialized AI Agents**: Each attack vector gets a dedicated agent with targeted tooling
-- **80+ Integrated Tools**: nmap, nuclei, sqlmap, ffuf, httpx, gau, katana, waybackurls, and more
-- **Auth Propagation**: Auth headers/cookies flow through every agent — recon, nuclei, enumeration, all vulnerability agents
-- **True-Positive Validation**: Independent curl-based reproduction (BountyGrimoire-inspired) before Python sandbox execution
-- **H1 Skill Learning**: Auto-fetches HackerOne disclosed reports, extracts payloads + remediations, generates `.md` skill files
-- **Autonomous Learning**: Self-improving skill system — learns from every scan and public disclosures
-- **LLM Integration**: OpenAI, Anthropic, OpenCode (DeepSeek V4), Google AI, Groq, LiteLLM
-- **Zero Dependency Docker**: All tools pre-baked in single Docker image, no pip/apt install needed
-- **Cross-Session Memory**: Blackboard + graph database stores findings, credentials, tech stack across scans
+- **🤖 30+ Specialized AI Agents** — Each attack vector gets a dedicated agent (SQLi, XSS, SSRF, JWT, IDOR, LFI, RCE, etc.)
+- **🧠 Self-Learning Skill System** — Auto-learns successful attack patterns as reusable skills with confidence scoring
+- **🎯 MCTS Attack Planning** — Monte Carlo Tree Search prioritizes the most promising attack paths
+- **🌐 Web Dashboard** — Real-time scan monitoring, technology filtering, session persistence
+- **🔗 Cross-Agent Chaining** — SSRF → internal pivot, SQLi → data extraction, IDOR → auth bypass
+- **📊 Dual Knowledge Graph** — Attack surface topology + temporal evolution tracking
+- **🛡️ 80+ Integrated Tools** — nmap, nuclei, pd-httpx, sqlmap, ffuf, gau, katana, waybackurls, and more
+- **🔑 Auth Propagation** — Headers/cookies flow through every agent automatically
+- **📈 4 Scan Modes** — quick (5min), standard (30min), deep (4hr), whitebox
 
-### Vulnerability Coverage
-- **Injection**: SQL, NoSQL, Command Injection, SSTI, LDAP Injection
-- **XSS**: Reflected, Stored, DOM-based, Blind XSS
-- **SSRF**: Internal network, cloud metadata, port scanning
-- **Authentication**: JWT attacks, weak credentials, session management, OAuth
-- **Access Control**: IDOR, privilege escalation, CORS misconfiguration
-- **Infrastructure**: Clickjacking, open redirect, host header injection, rate limiting
-- **Cloud**: Prowler (AWS/Azure/GCP), ScoutSuite, Trivy (containers/K8s/IaC)
-- **Active Directory**: Certipy, BloodHound, Kerbrute, Impacket, NetExec, Responder
-- **Mobile**: MobSF (APK/IPA analysis), Frida (dynamic instrumentation)
-
-### Scanning Modes
-| Mode | Duration | Depth | Use Case |
-|---|---|---|---|
-| `quick` | 5-15 min | Surface scan | CI/CD gate |
-| `standard` | 30-60 min | Standard depth | Bug bounty triage |
-| `deep` | 1-4 hrs | Full coverage | Pentest engagement |
-| `whitebox` | varies | Source-sink analysis | Code review |
+---
 
 ## Quick Start
 
-### One-line Install (Linux/macOS)
+### Docker (recommended)
+
+```bash
+docker pull iamaworker135/argus:latest
+
+# Web dashboard
+docker run -d -p 8484:8484 \
+  -e LLM_API_KEY="sk-your-key" \
+  iamaworker135/argus:latest
+
+# Quick scan
+docker run --rm \
+  -e LLM_API_KEY="sk-your-key" \
+  iamaworker135/argus:latest \
+  strix --target https://testfire.net -m quick
+
+# Full pentest with auth
+docker run --rm \
+  -e LLM_API_KEY="sk-your-key" \
+  -e ARGUS_AUTH_HEADERS='{"Authorization": "Bearer eyJ..."}' \
+  iamaworker135/argus:latest \
+  strix --target https://example.com -m deep
+```
+
+### One-line Native Install (Linux/macOS)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/iamaworker-github/argus/main/install.sh | bash
 ```
 
-Auto-installs: Python venv, pd-httpx, naabu, nuclei, katana, gau, waybackurls, nmap, web dashboard & all dependencies.
+Auto-installs: Python venv, pd-httpx, naabu, nuclei, katana, gau, waybackurls, nmap, web dashboard.
 
-### Docker (recommended)
+---
 
-```bash
-docker pull ghcr.io/iamaworker-github/argus:latest
+## Scan Modes
 
-# Quick scan
-docker run --rm -it -v $(pwd):/work \
-  ghcr.io/iamaworker-github/argus:latest strix -t https://example.com -m quick
+| Mode | Duration | Description |
+|------|----------|-------------|
+| `quick` | 5-15 min | Surface scan — CI/CD gate, low-hanging fruit |
+| `standard` | 30-60 min | Standard depth — bug bounty triage |
+| `deep` | 1-4 hrs | Full coverage — pentest engagement |
+| `whitebox` | varies | Source-sink analysis — code review |
 
-# Deep pentest with AI
-docker run --rm -it \
-  -v $(pwd):/work \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  -e LLM_API_KEY="your-key" \
-  ghcr.io/iamaworker-github/argus:latest strix -t https://example.com -m deep
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Planner Layer                            │
+│  MCTS Planner ──► Goal Tree ──► Agent Composer ──► Skills  │
+├─────────────────────────────────────────────────────────────┤
+│                     Execution Layer                          │
+│  Phase 1: AI Planning    Phase 5: Vuln Testing (21 agents) │
+│  Phase 2: Reconnaissance  Phase 6: AI Analysis             │
+│  Phase 3: Enumeration     Phase 7: Exploitation            │
+│  Phase 4: Service Scan    Phase 8: Reporting               │
+├─────────────────────────────────────────────────────────────┤
+│                     Intelligence Layer                       │
+│  Meta-Cognition ──► Budget Controller ──► Skill Library     │
+│  Context Injector ──► Cross-Agent Chaining ──► EvoGraph    │
+├─────────────────────────────────────────────────────────────┤
+│                     Infrastructure                           │
+│  Web Dashboard ──► Event Bus ──► Memory ──► Auth Provider  │
+│  Sandbox ──► Tool Registry ──► LLM Client ──► MCP Server   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Auth Propagation
+### Vulnerability Coverage
 
-Pass authenticated context to every agent:
+| Category | Tests |
+|----------|-------|
+| **Injection** | SQL, NoSQL, Command, SSTI, LDAP |
+| **XSS** | Reflected, Stored, DOM-based, Blind |
+| **SSRF** | Internal network, cloud metadata, port scan |
+| **Auth** | JWT attacks, weak credentials, session, OAuth |
+| **Access Control** | IDOR, privilege escalation, CORS |
+| **Infra** | Clickjacking, open redirect, host header, rate limit |
 
-```bash
-export ARGUS_AUTH_HEADERS='{"Authorization": "Bearer eyJ..."}'
-export ARGUS_AUTH_COOKIES='{"session": "abc123"}'
-
-# Auth headers flow to: httpx -td, nuclei -H, gau, katana, waybackurls, path bruteforce
-docker run --rm -it \
-  -e ARGUS_AUTH_HEADERS="$ARGUS_AUTH_HEADERS" \
-  -e ARGUS_AUTH_COOKIES="$ARGUS_AUTH_COOKIES" \
-  ghcr.io/iamaworker-github/argus:latest strix -t https://example.com
-```
+---
 
 ## Web Dashboard
 
-```bash
-# Start API + web interface on port 8484
-docker run --rm -d -p 8484:8484 \
-  -v /var/run/docker.sock:/var/run/docker.sock:ro \
-  ghcr.io/iamaworker-github/argus:latest api
+Open `http://localhost:8484` after starting:
 
-# Open http://localhost:8484
+```bash
+docker run -d -p 8484:8484 iamaworker135/argus:latest
 ```
+
+Features: real-time scan logs, technology filtering, attack graph visualization, session management, report export.
+
+---
+
+## Configuration
+
+```bash
+# Required: LLM provider
+export LLM_API_KEY="sk-your-key"
+
+# Optional: model selection
+export LLM_MODEL="openai/gpt-4o"
+
+# Auth propagation
+export ARGUS_AUTH_HEADERS='{"Authorization": "Bearer eyJ..."}'
+export ARGUS_AUTH_COOKIES='{"session": "abc123"}'
+
+# Scan behavior
+export USE_DOCKER=false
+export SCAN_DEPTH=deep
+```
+
+---
 
 ## Build from Source
 
 ```bash
 git clone https://github.com/iamaworker-github/argus.git
 cd argus
+
+# Docker
 docker build -t argus:latest .
-```
 
-## Native Install
-
-### Automatic (install.sh)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/iamaworker-github/argus/main/install.sh | bash
-```
-
-### Manual
-
-```bash
-git clone https://github.com/iamaworker-github/argus.git
-cd argus
+# Native
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-pip install -e .
-python -m playwright install chromium
+pip install -e ".[web]"
+argus --help
 ```
+
+---
 
 ## Project Structure
 
 ```
 argus/
-├── agents/                30+ specialized AI agents
-│   ├── modes/
-│   │   └── pentest.py    7-stage pipeline orchestrator
-│   ├── base_agent.py     Auth propagation, HTTP client helpers
-│   ├── plan_agent.py     LLM-based target analysis & planning
-│   ├── recon_agent.py    Tech detection (httpx -td), headers
-│   ├── waf_detection_agent.py  WAF detection & fingerprinting
-│   ├── nuclei_agent.py   Batch nuclei template scanning
-│   ├── poc_validator_agent.py  Curl-based independent validation
-│   ├── backmeup_agent.py(gau/katana/waybackurls harvester)
-│   ├── smart_bruteforce_agent.py  Auth-aware path bruteforce
-│   ├── sql_injection_agent.py
-│   ├── xss_agent.py
-│   ├── ssrf_agent.py
-│   ├── jwt_attack_agent.py
-│   ├── cors_agent.py
-│   ├── clickjacking_agent.py
-│   ├── host_header_injection_agent.py
-│   ├── open_redirect_agent.py
-│   ├── rate_limit_agent.py
-│   ├── ssti_agent.py
-│   ├── xxe_agent.py
-│   ├── nosql_injection_agent.py
-│   └── ... (21+ vulnerability agents)
-├── core/
-│   ├── skill_learner.py  H1 disclosure fetcher, skill generator
-│   ├── tool_runner.py    Unified tool execution (Docker/Native)
-│   ├── tool_system.py    Typed tool registry
-│   └── json_utils.py     Robust LLM JSON extraction
-├── data/
-│   └── tools.json        84-tool central index
-├── toolkit/
-│   └── backmeup_agent.py URL harvesting toolkit
-├── skills/               Agent skill knowledge packages
-├── web-dashboard/        React-based web UI (port 8484)
-├── Dockerfile            Multi-stage: Node 22 + Ubuntu 24.04 + Go
-└── README.md
+├── agents/              30+ specialized AI agents
+│   ├── modes/pentest.py 8-stage orchestrator
+│   ├── base_agent.py    Shared agent infrastructure
+│   ├── cms/             CMS-specific agents (WP, Drupal, Joomla...)
+│   ├── stack/           Stack-specific agents (Node, Flask, Spring...)
+│   └── iot_agent.py     IoT security agent
+├── core/                Intelligence & infrastructure
+│   ├── mcts_planner.py  Monte Carlo Tree Search
+│   ├── goal_tree.py     Recursive goal decomposition
+│   ├── agent_composer.py Dynamic agent assembly
+│   ├── skill_library.py Auto-learning skill system
+│   ├── budget_controller.py Per-agent budget enforcement
+│   ├── meta_cognition.py Self-reflection & strategy shift
+│   ├── context_injector.py Dynamic target context
+│   ├── evograph.py      Dual knowledge graph
+│   ├── sandbox.py       Docker sandbox pool
+│   └── ...              ACI, runbooks, confidence, fix pipeline
+├── web-dashboard/       React + Vite dashboard
+├── toolkit/             Tool management & installation
+├── skills/              Attack skill knowledge base
+├── benchmarks/          Benchmark suites (4 suites, 9 tests)
+├── Dockerfile           Single-stage Ubuntu + Go + Python
+└── install.sh           One-curl installer
 ```
+
+---
+
+## Docker Hub
+
+Pre-built images available at [iamaworker135/argus](https://hub.docker.com/r/iamaworker135/argus):
+
+- `latest` — latest stable release
+- `v2.0.0` — versioned release
+
+---
 
 ## Use Cases
 
-| Use Case | Mode | Expected |
-|---|---|---|
-| **CI/CD Security Gate** | quick | 5-15 min, blocks critical + high findings |
-| **Bug Bounty Triage** | standard | 30-60 min, finds low-hanging fruit fast |
-| **Pentest Engagement** | deep | 1-4 hrs, full-chain exploitation |
-| **CTF Automation** | deep | Stages attacks, flags all services |
-| **Continuous Monitoring** | API mode | Scheduled scans, web dashboard |
+- **CI/CD Security Gate** — `quick` mode blocks critical/high findings in CI pipelines
+- **Bug Bounty Triage** — `standard` mode finds low-hanging fruit fast
+- **Pentest Engagement** — `deep` mode with full-chain exploitation
+- **Continuous Monitoring** — Web dashboard with scheduled scans
+- **CTF Automation** — Autonomous flag capture via multi-agent coordination
+
+---
 
 ## License
 
@@ -212,6 +223,6 @@ Apache 2.0. See [LICENSE](LICENSE).
 
 > **For authorized security testing, bug bounty, CTFs, and research only.**
 
-## ⚠️ WARNING
+## ⚠️ Warning
 
 This tool performs active security testing that may disrupt target services. Always obtain written authorization before testing. Unauthorized access is illegal.

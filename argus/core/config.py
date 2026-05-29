@@ -204,7 +204,7 @@ class Config:
                         value = int(value)
                     except ValueError:
                         pass
-                elif field_name in {"headless_browser", "verbose", "debug", "use_docker"}:
+                elif field_name in {"headless_browser", "verbose", "debug", "use_docker", "docker_mandatory"}:
                     value = value.lower() == "true"
                 elif field_name == "output_dir":
                     value = Path(value)
