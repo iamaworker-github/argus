@@ -6,6 +6,7 @@ from argus.mcp.tools import (
     run_scan, get_status, list_findings, list_tools, get_attack_surface, medusa_scan,
     bounty_search_programs, bounty_get_program, bounty_triage_finding,
     bounty_find_programs, bounty_submit_report,
+    health_check, check_tool, diagnose, list_allowed_tools,
 )
 from argus.mcp.transports import handle_stdio, handle_sse
 
@@ -77,6 +78,18 @@ class MCPApp:
                     platform=params["platform"],
                     report_data=params["report"],
                 )
+                return {"id": msg_id, "result": result}
+            elif method == "health_check":
+                result = await health_check()
+                return {"id": msg_id, "result": result}
+            elif method == "check_tool":
+                result = await check_tool(tool_name=params["tool_name"])
+                return {"id": msg_id, "result": result}
+            elif method == "diagnose":
+                result = await diagnose()
+                return {"id": msg_id, "result": result}
+            elif method == "list_allowed_tools":
+                result = await list_allowed_tools()
                 return {"id": msg_id, "result": result}
             elif method == "ping":
                 return {"id": msg_id, "result": "pong"}

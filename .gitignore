@@ -39,4 +39,14 @@ node_modules/
 # Frontend build output
 web-dashboard/dist/
 
+# Generated data files
+json
+benchmarks/benchmark_results_*.json
+
+# Auto-generated skills
+skills/learned/
+
+# Build artifacts
+argus_security.egg-info/
+
 

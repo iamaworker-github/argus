@@ -11,6 +11,7 @@ import ThinkingPanel from './components/ThinkingPanel';
 import RightPanel from './components/RightPanel';
 import BottomBar from './components/BottomBar';
 import ToastNotification from './components/ToastNotification';
+import ChatPanel from './components/ChatPanel';
 
 const AGENT_DISPLAY_NAMES: Record<string, string> = {
   'Plan Agent': 'AI Planning Agent',
@@ -25,6 +26,7 @@ export default function App() {
   const [filterAgent, setFilterAgent] = useState('all');
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -157,6 +159,17 @@ export default function App() {
         />
       </div>
 
+      <div className="relative">
+        <div className="absolute bottom-0 right-0 z-40 mb-1 mr-2">
+          <button
+            onClick={() => setChatOpen(!chatOpen)}
+            className="text-[11px] font-mono text-zinc-400 hover:text-zinc-200 border border-zinc-700 hover:border-zinc-500 px-2 py-0.5 rounded transition-colors bg-zinc-900"
+          >
+            {chatOpen ? 'Close Chat' : 'AI Chat'}
+          </button>
+        </div>
+        <ChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} />
+      </div>
       <BottomBar onCommand={handleCommand} shortcuts={['? Help', 'Tab Complete', 'Ctrl+K Commands', 'Ctrl+D Exit']} />
     </div>
   );

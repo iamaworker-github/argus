@@ -96,13 +96,20 @@ class ReconAgent(BaseAgent):
         except Exception as e:
             logger.debug(f"DNS enumeration error: {e}")
 
+    @staticmethod
+    def _find_httpx() -> str:
+        import shutil
+        return "httpx" if shutil.which("httpx") else "pd-httpx"
+
     async def _detect_technologies(self) -> None:
         """Detect web technologies and IP using httpx -ip -td"""
         import json as _json
+        from urllib.parse import urlparse as _urlparse
         await self._emit_thought(f"Probing {self.target} with httpx -ip -td...", "recon", "tech_detection")
         try:
-            domain = self.target.split('/')[0].split(':')[0]
-            httpx_cmd = ["pd-httpx", "-u", domain, "-ip", "-td", "-json", "-sc", "-silent"]
+            domain = _urlparse(self.target).hostname or self.target.split('/')[0].split(':')[0]
+            httpx_bin = self._find_httpx()
+            httpx_cmd = [httpx_bin, "-u", domain, "-ip", "-td", "-json", "-sc", "-silent"]
             httpx_cmd.extend(self.format_auth_args())
             proc = await asyncio.create_subprocess_exec(
                 *httpx_cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,

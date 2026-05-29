@@ -273,10 +273,12 @@ class LLMClient:
             api_base = self.config.get("blockrun_api_base")
             if not api_base:
                 api_base = "https://blockrun.ai/api/v1"
+            kwargs["custom_llm_provider"] = "openai"
         elif "opencode" in m:
             api_base = self.config.get("opencode_api_base")
             if not api_base:
-                api_base = "https://api.opencode.ai/v1"
+                api_base = "https://opencode.ai/zen/v1"
+            kwargs["custom_llm_provider"] = "openai"
         elif "deepseek" in m:
             api_base = self.config.get("deepseek_api_base")
             if not api_base:

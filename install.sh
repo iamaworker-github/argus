@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Argus - AI-Powered Security Testing Platform
-# One-line: curl -fsSL https://raw.githubusercontent.com/iamaworker135/argus/main/install.sh | bash
+# One-line: curl -fsSL https://raw.githubusercontent.com/iamaworker-github/argus/main/install.sh | bash
 set -euo pipefail
 
 # =============================================================================
 # Configuration - override via environment
 # =============================================================================
-REPO_OWNER="${REPO_OWNER:-iamaworker135}"
+REPO_OWNER="${REPO_OWNER:-iamaworker-github}"
 REPO_NAME="${REPO_NAME:-argus}"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/argus}"
 BRANCH="${BRANCH:-main}"

@@ -26,8 +26,14 @@ if MEMORY_SYSTEM_AVAILABLE:
     from argus.core.memory_models import Vulnerability, VulnerabilitySeverity
 from argus.core.blackboard import Blackboard, FindingCategory, get_blackboard
 from argus.core.learning_engine import get_learning_engine
+from argus.core.budget_controller import get_budget_controller
+from argus.core.meta_cognition import get_meta_cognition
+from argus.core.skill_library import get_skill_library
 from argus.core.todo_manager import get_todo_manager, TodoItem, TodoStatus, TodoPriority
 from argus.core.thinking_chain import get_thinking_chain
+from argus.core.agent_handoff import get_handoff_manager, HandoffContext
+from argus.core.aci import get_aci_registry, register_default_contracts
+register_default_contracts()
 from argus.toolkit import (
     BrowserAutomation,
     HTTPProxy,
@@ -39,12 +45,32 @@ logger = get_logger()
 
 
 class AgentStatus(Enum):
-    """Agent execution status"""
+    """Formal state machine for agent lifecycle.
+    Transitions:
+      IDLE → PLANNING → EXECUTING → COMPLETED
+                        → PAUSED → EXECUTING
+                        → ERROR
+              PLANNING → ERROR
+    """
     IDLE = "idle"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
+    PLANNING = "planning"
+    EXECUTING = "executing"
     PAUSED = "paused"
+    COMPLETED = "completed"
+    ERROR = "error"
+    CANCELLED = "cancelled"
+
+    def can_transition_to(self, target: "AgentStatus") -> bool:
+        VALID = {
+            AgentStatus.IDLE:      {AgentStatus.PLANNING},
+            AgentStatus.PLANNING:  {AgentStatus.EXECUTING, AgentStatus.ERROR, AgentStatus.CANCELLED},
+            AgentStatus.EXECUTING: {AgentStatus.COMPLETED, AgentStatus.PAUSED, AgentStatus.ERROR, AgentStatus.CANCELLED},
+            AgentStatus.PAUSED:    {AgentStatus.EXECUTING, AgentStatus.CANCELLED},
+            AgentStatus.COMPLETED: set(),
+            AgentStatus.ERROR:     {AgentStatus.PLANNING},
+            AgentStatus.CANCELLED: {AgentStatus.PLANNING},
+        }
+        return target in VALID.get(self, set())
 
 
 @dataclass
@@ -145,6 +171,9 @@ class BaseAgent(ABC):
         # Cross-agent baton context (set by orchestrator in sequential mode)
         self.context: Dict[str, Any] = {}
 
+        # Phase label for handoff context (set by orchestrator)
+        self.phase: str = "general"
+
         # Auth headers/cookies for authenticated scanning (set by orchestrator)
         self.auth_headers: Dict[str, str] = {}
         self.auth_cookies: Dict[str, str] = {}
@@ -169,6 +198,15 @@ class BaseAgent(ABC):
         self._paused_event: asyncio.Event = asyncio.Event()
         self._paused_event.set()
 
+        # ---- Autonomous enhancements ----
+        self._budget_controller = get_budget_controller()
+        self._budget_controller.register_agent(self.name)
+        self._meta_cognition = get_meta_cognition()
+        self._meta_cognition.register_agent(self.name)
+        self._skill_library = get_skill_library()
+        self._current_technique: str = ""
+        self._reflection_callback: Optional[callable] = None
+
     def cancel(self) -> None:
         """Signal the agent to stop at the next safe checkpoint."""
         self._cancelled = True
@@ -189,8 +227,22 @@ class BaseAgent(ABC):
 
     @property
     def should_stop(self) -> bool:
-        """Check if a cancel signal has been sent."""
+        """Check if cancellation has been requested"""
         return self._cancelled
+
+    def budget_tool_call(self, technique: str = "", success: bool = False, error: str = ""):
+        self._budget_controller.record_call(self.name)
+        if technique:
+            self._current_technique = technique
+        self._meta_cognition.record_step(self.name, technique=technique or self._current_technique, success=success, error=error)
+        should_stop, reason = self._budget_controller.should_stop(self.name)
+        if should_stop:
+            logger.info(f"⏹ {self.name}: Budget stop — {reason}")
+            self._cancelled = True
+        insight = self._meta_cognition.check_reflection(self.name, interval=5)
+        if insight and self._reflection_callback:
+            self._reflection_callback(insight)
+        return should_stop
 
     async def check_pause(self) -> None:
         """If paused, wait until resumed. Does nothing when not paused."""
@@ -266,14 +318,61 @@ class BaseAgent(ABC):
             await self.proxy.stop()
         logger.debug(f"{self.name}: Toolkit cleaned up")
 
+    async def _emit_thought(self, thought: str, thought_type: str = "reasoning", phase: str = "") -> None:
+        if self.event_bus:
+            try:
+                from argus.core.events import AgentThinkingEvent
+                await self.event_bus.publish_event(AgentThinkingEvent(
+                    agent_name=self.name,
+                    thought=thought,
+                    thought_type=thought_type,
+                    phase=phase,
+                ))
+            except Exception:
+                pass
+
+    async def publish_handoff(self, result: "AgentResult") -> None:
+        try:
+            hm = get_handoff_manager()
+            techs = self.context.get("shared_technologies", []) or []
+            endpoints = self.context.get("shared_endpoints", []) or []
+            finding_titles = [f.title for f in result.findings[:10]]
+            summary = f"{len(result.findings)} findings: {'; '.join(finding_titles)}" if finding_titles else "No findings"
+            ctx = HandoffContext(
+                agent_name=self.name,
+                phase=self.phase,
+                target=self.target,
+                findings_summary=summary,
+                technologies=techs,
+                endpoints=endpoints,
+                blocked_paths=self.context.get("blocked_paths", []),
+                recommendations=self.context.get("recommendations", []),
+                metadata={
+                    "findings_count": len(result.findings),
+                    "execution_time": result.execution_time,
+                    "result_status": result.status.value if hasattr(result.status, "value") else str(result.status),
+                },
+            )
+            hm.publish(ctx)
+            self.context["handoff_context"] = hm.build_handoff_prompt(self.target)
+        except Exception as e:
+            logger.debug(f"Handoff publish failed: {e}")
+
     @abstractmethod
     async def execute(self) -> AgentResult:
         """Execute agent's security testing logic"""
         pass
 
+    def _transition(self, target: AgentStatus) -> bool:
+        if self.status.can_transition_to(target):
+            self.status = target
+            return True
+        logger.warning(f"{self.name}: Invalid status transition {self.status.value} → {target.value}")
+        return False
+
     async def run(self) -> AgentResult:
-        """Run the agent with proper lifecycle management"""
-        self.status = AgentStatus.RUNNING
+        """Run the agent with formal state machine lifecycle"""
+        self._transition(AgentStatus.PLANNING)
         self.start_time = asyncio.get_event_loop().time()
 
         # Publish agent started event (if event bus available)
@@ -297,34 +396,40 @@ class BaseAgent(ABC):
             thought_type="intent",
             phase="init",
         )
+        await self._emit_thought(f"Starting analysis of {self.target}", thought_type="intent", phase="init")
         # Inject prior thinking chain context into agent context
         self.context["thinking_chain"] = thinking_chain.get_context_for_agent(self.name, max_blocks=15)
 
         logger.info(f"🤖 {self.name} started on {self.target}")
 
         try:
-            # Initialize toolkit
             await self.initialize_toolkit()
 
             if self.should_stop:
                 logger.info(f"{self.name}: Cancelled before execution")
-                self.status = AgentStatus.FAILED
+                self._transition(AgentStatus.CANCELLED)
                 self.end_time = asyncio.get_event_loop().time()
                 return AgentResult(
                     agent_name=self.name,
-                    status=AgentStatus.FAILED,
+                    status=AgentStatus.CANCELLED,
                     findings=self.findings,
                     execution_time=0,
                     error="Cancelled before execution",
                 )
 
-            # Execute agent logic
+            self._transition(AgentStatus.EXECUTING)
             result = await self.execute()
 
-            # Mark as completed
-            self.status = AgentStatus.COMPLETED
-            self.end_time = asyncio.get_event_loop().time()
+            # Budget & meta-cognition summary
+            budget_report = self._budget_controller.get_report(self.name)
+            if budget_report:
+                logger.debug(f"{self.name} budget: {budget_report['calls']} calls, {budget_report['findings']} findings ({budget_report['findings_per_call']}/call)")
+            meta_summary = self._meta_cognition.get_summary(self.name)
+            if meta_summary and meta_summary.get("reflections"):
+                logger.info(f"🧠 {self.name} reflections: {' | '.join(meta_summary['reflections'][-3:])}")
 
+            self._transition(AgentStatus.COMPLETED)
+            self.end_time = asyncio.get_event_loop().time()
             result.execution_time = self.end_time - self.start_time
 
             # Push thinking block on completion
@@ -335,15 +440,17 @@ class BaseAgent(ABC):
                 phase="complete",
                 metadata={"findings_count": len(result.findings), "execution_time": result.execution_time},
             )
+            await self._emit_thought(
+                f"Completed: {len(result.findings)} findings, {result.execution_time:.1f}s",
+                thought_type="summary", phase="complete",
+            )
             logger.success(f"✓ {self.name} completed ({len(result.findings)} findings)")
 
-            # Wait for all pending async tasks to complete
             if self._pending_tasks:
                 logger.debug(f"Waiting for {len(self._pending_tasks)} pending tasks...")
                 await asyncio.gather(*self._pending_tasks, return_exceptions=True)
                 self._pending_tasks.clear()
 
-            # Publish agent completed event (if event bus available)
             if self.event_bus:
                 try:
                     await self.event_bus.publish_event(AgentCompletedEvent(
@@ -357,14 +464,14 @@ class BaseAgent(ABC):
                 except Exception as e:
                     logger.debug(f"Failed to publish agent completed event: {e}")
 
+            await self.publish_handoff(result)
             return result
 
         except Exception as e:
-            self.status = AgentStatus.FAILED
+            self._transition(AgentStatus.ERROR)
             self.end_time = asyncio.get_event_loop().time()
             logger.error(f"✗ {self.name} failed: {e}")
 
-            # Publish agent failed event (if event bus available)
             if self.event_bus:
                 try:
                     await self.event_bus.publish_event(AgentFailedEvent(
@@ -379,14 +486,13 @@ class BaseAgent(ABC):
 
             return AgentResult(
                 agent_name=self.name,
-                status=AgentStatus.FAILED,
+                status=AgentStatus.ERROR,
                 findings=self.findings,
                 execution_time=self.end_time - self.start_time if self.start_time else 0,
                 error=str(e)
             )
 
         finally:
-            # Cleanup
             await self.cleanup_toolkit()
 
     def get_inter_agent_context(self) -> str:
@@ -631,6 +737,17 @@ class BaseAgent(ABC):
                 success=finding.confidence >= 0.5,
                 tags=[finding.severity, finding.agent_name],
             )
+        except Exception:
+            pass
+
+        # Track in budget & meta-cognition
+        self._budget_controller.record_finding(self.name)
+        self._meta_cognition.record_finding(self.name)
+
+        # Auto-learn skill from high-confidence findings
+        try:
+            shared_techs = self.context.get("shared_technologies", []) or self.context.get("technologies", [])
+            self._skill_library.learn_from_finding(finding, self.name, self.target, shared_techs)
         except Exception:
             pass
 

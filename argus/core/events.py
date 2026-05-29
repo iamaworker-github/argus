@@ -490,6 +490,7 @@ class SystemMetricEvent(BaseEvent):
 
 EVENT_TYPE_REGISTRY: Dict[str, type] = {
     "agent.started": AgentStartedEvent,
+    "agent.thinking": AgentThinkingEvent,
     "agent.progress": AgentProgressEvent,
     "agent.completed": AgentCompletedEvent,
     "agent.failed": AgentFailedEvent,

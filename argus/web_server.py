@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from argus.core.logger import get_logger
 from argus.core.event_bus import get_event_bus
 from argus.core.di_container import get_container
+from argus.core.session import SessionManager
 from argus.agents.orchestrator import AgentOrchestrator
 
 logger = get_logger()
@@ -47,9 +48,11 @@ class ScanRequest(BaseModel):
 
 # ---- State manager ----
 class DashboardState:
-    """Tracks current scan state for WebSocket clients."""
+    """Tracks current scan state for WebSocket clients with disk persistence."""
 
     def __init__(self):
+        self.session_mgr: Optional[SessionManager] = None
+        self._session_dirty = False
         self.state: Dict[str, Any] = {
             "cpu": 0,
             "mem": 0,
@@ -111,6 +114,68 @@ class DashboardState:
         if data.get("target") and not self.state.get("nodes"):
             self.state["nodes"] = [{"id": "root", "label": data["target"], "x": 50, "y": 10, "type": "host", "color": "#00ff88"}]
 
+    def _ensure_session(self) -> SessionManager:
+        if self.session_mgr is None:
+            self.session_mgr = SessionManager()
+        return self.session_mgr
+
+    def save_to_session(self):
+        try:
+            sm = self._ensure_session()
+            state = self.state
+            sm.save_session({
+                "findings": state.get("findings", []),
+                "agent_states": {a.get("name", ""): a.get("status", "") for a in state.get("agents", [])},
+                "scan_progress": {
+                    "pipeline": state.get("pipeline", []),
+                    "technologies": state.get("technologies", []),
+                    "discoveries": state.get("discoveries", []),
+                    "nodes": state.get("nodes", []),
+                    "edges": state.get("edges", []),
+                },
+                "chat_history": state.get("chat_history", []),
+                "mode": state.get("mode", ""),
+                "target": state.get("target", ""),
+                "duration": state.get("duration", 0.0),
+            })
+            self._session_dirty = False
+        except Exception as e:
+            logger.debug(f"Session save error: {e}")
+
+    def load_from_session(self, session_id: str) -> bool:
+        try:
+            sm = SessionManager()
+            data = sm.load_session(session_id)
+            if not data:
+                return False
+            findings = data.get("findings", [])
+            scan_progress = data.get("scan_progress", {})
+            pipeline = scan_progress.get("pipeline", [])
+            nodes = scan_progress.get("nodes", [])
+            edges = scan_progress.get("edges", [])
+            technologies = scan_progress.get("technologies", [])
+            discoveries = scan_progress.get("discoveries", [])
+            self.state.update({
+                "findings": findings,
+                "findingsCount": len(findings),
+                "pipeline": pipeline,
+                "nodes": nodes,
+                "edges": edges,
+                "technologies": technologies,
+                "technologies_count": len(technologies),
+                "discoveries": discoveries,
+                "mode": data.get("mode", "PENTEST"),
+                "target": data.get("target", ""),
+                "sessionId": session_id,
+                "agentStatus": "IDLE",
+                "chat_history": data.get("chat_history", []),
+            })
+            self.session_mgr = sm
+            return True
+        except Exception as e:
+            logger.debug(f"Session load error: {e}")
+            return False
+
     def get_state(self) -> Dict[str, Any]:
         elapsed = int(time.time() - self._start_time)
         h, m, s = elapsed // 3600, (elapsed % 3600) // 60, elapsed % 60
@@ -156,6 +221,7 @@ def setup_event_subscriptions():
             "logs": logs[-50:],
             "activities": activities[-30:],
         })
+        dashboard_state._session_dirty = True
         await broadcast_state()
 
     @bus.subscribe("agent.completed")
@@ -176,6 +242,7 @@ def setup_event_subscriptions():
             "logs": logs[-50:],
             "activities": activities[-30:],
         })
+        dashboard_state._session_dirty = True
         await broadcast_state()
 
     @bus.subscribe("agent.failed")
@@ -235,7 +302,7 @@ def setup_event_subscriptions():
         logs = dashboard_state.state.get("logs", [])
         logs = _append_log(logs, {"text": f"Finding: {event.title} [{event.severity.upper()}]", "type": "warning", "timestamp": now, "agent_name": event.agent_name})
 
-        # Extract technologies from findings (Recon Agent batch or httpx inline)
+        # Extract technologies from findings (Recon Agent batch, httpx inline, or any tech finding)
         tech_update = {}
         existing_techs = dashboard_state.state.get("technologies", [])
         existing_names = {t.get("name") if isinstance(t, dict) else t for t in existing_techs}
@@ -253,6 +320,11 @@ def setup_event_subscriptions():
             if tech_name and tech_name not in existing_names:
                 new_techs.append({"name": tech_name, "icon": "", "percent": 100})
                 existing_names.add(tech_name)
+        elif event.severity == "info" and event.category == "osint_tech" and "Technology" in event.title:
+            tech_name = event.title.replace("Technology: ", "").strip() if "Technology:" in event.title else event.title.strip()
+            if tech_name and tech_name not in existing_names:
+                new_techs.append({"name": tech_name, "icon": "", "percent": 100})
+                existing_names.add(tech_name)
         if new_techs:
             tech_update = {
                 "technologies": existing_techs + new_techs,
@@ -266,6 +338,7 @@ def setup_event_subscriptions():
             "logs": logs[-50:],
             **tech_update,
         })
+        dashboard_state._session_dirty = True
         await broadcast_state()
 
     @bus.subscribe("agent.progress")
@@ -368,6 +441,17 @@ async def broadcast_state():
         dashboard_state.clients.discard(d)
 
 
+async def _auto_save_tick():
+    """Periodically save dashboard state to session on disk."""
+    while True:
+        await asyncio.sleep(15)
+        try:
+            if dashboard_state._session_dirty:
+                dashboard_state.save_to_session()
+        except Exception:
+            pass
+
+
 async def _health_tick():
     """Periodically update system health metrics — live data."""
     import psutil
@@ -435,6 +519,18 @@ async def startup():
     await bus.start()
     setup_event_subscriptions()
     asyncio.create_task(_health_tick())
+    asyncio.create_task(_auto_save_tick())
+
+    # Load latest session from disk for persistence across restarts
+    try:
+        latest = SessionManager.get_latest_session()
+        if latest:
+            sid = latest.get("session_id", "")
+            if sid:
+                dashboard_state.load_from_session(sid)
+                logger.info(f"Loaded last session: {sid} ({latest.get('target', 'unknown')})")
+    except Exception as e:
+        logger.debug(f"No previous session to load: {e}")
 
     # Start pending scan if set via CLI argus web -t
     if _pending_scan:
@@ -472,6 +568,8 @@ async def start_scan(req: ScanRequest):
         "thinkingLines": [],
         "activities": [],
         "discoveries": [],
+        "technologies": [],
+        "technologies_count": 0,
     })
     await broadcast_state()
 
@@ -566,7 +664,52 @@ async def _run_scan_task(target: str, mode: str, session_id: str):
 
 @app.get("/api/scans")
 async def list_scans():
-    return {"scans": []}
+    sessions = SessionManager.list_sessions()
+    return {"scans": sessions}
+
+
+@app.get("/api/scans/{session_id}")
+async def load_scan(session_id: str):
+    ok = dashboard_state.load_from_session(session_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await broadcast_state()
+    return {"status": "loaded", "session_id": session_id}
+
+
+chat_history_store: List[Dict[str, Any]] = []
+
+
+class ChatRequest(BaseModel):
+    message: str
+
+
+@app.get("/api/chat")
+async def get_chat():
+    return {"messages": chat_history_store[-50:]}
+
+
+@app.post("/api/chat")
+async def post_chat(req: ChatRequest):
+    user_entry = {"role": "user", "text": req.message, "timestamp": datetime.now().isoformat(), "id": uuid.uuid4().hex[:8]}
+    chat_history_store.append(user_entry)
+    dashboard_state.state.setdefault("chat_history", []).append(user_entry)
+    dashboard_state._session_dirty = True
+    try:
+        from argus.agents.llm_client import LLMClient
+        client = LLMClient()
+        system_prompt = "You are Argus AI, a cybersecurity assistant embedded in an autonomous pentesting dashboard. Answer concisely with security-relevant information."
+        response = await client.generate(req.message, system=system_prompt, max_tokens=500, task="chat")
+        reply_text = response.content if hasattr(response, 'content') else str(response)
+        if not reply_text or reply_text.strip() == req.message:
+            reply_text = "I'm analyzing the current scan state. For specific findings, check the Findings panel."
+    except Exception:
+        reply_text = "I'm processing your request. Check the scan progress for updates."
+    reply_entry = {"role": "assistant", "text": str(reply_text)[:1000], "timestamp": datetime.now().isoformat(), "id": uuid.uuid4().hex[:8]}
+    chat_history_store.append(reply_entry)
+    dashboard_state.state.setdefault("chat_history", []).append(reply_entry)
+    dashboard_state._session_dirty = True
+    return {"reply": reply_entry["text"]}
 
 
 @app.websocket("/ws")

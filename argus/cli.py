@@ -124,9 +124,32 @@ def build_parser() -> argparse.ArgumentParser:
     strix_parser.add_argument("--profile", type=str, default=None,
                               help="Auth profile name for authenticated scanning (from ~/.argus/auth-profiles/)")
     strix_parser.add_argument("--checkpoint", action="store_true",
-                              help="Enable workspace resume with checkpointing")
+                               help="Enable workspace resume with checkpointing")
     strix_parser.add_argument("--temporal", action="store_true",
-                              help="Enable distributed temporal orchestration (requires Redis)")
+                               help="Enable distributed temporal orchestration (requires Redis)")
+
+    # ====================================================================
+    # Bug Bounty Flags (Dark-Moon style — rich scope definition)
+    # ====================================================================
+    strix_parser.add_argument("--program", type=str, default=None,
+                               help="Bug bounty program name (e.g., \"Juice Shop\")")
+    strix_parser.add_argument("--focus", type=str, default=None,
+                               help="Comma-separated focus vulnerabilities (e.g., sqli,xss,idor)")
+    strix_parser.add_argument("--exclude-flags", type=str, default=None,
+                               help="Free-form exclusion rules interpreted by LLM (e.g., H1, OOS)")
+    strix_parser.add_argument("--noise", type=str, choices=["stealth", "low", "moderate", "high"],
+                               default="moderate", help="Noise level: stealth (minimal), low, moderate, high (aggressive)")
+    strix_parser.add_argument("--severity-cap", type=str, choices=["critical", "high", "medium", "low", "info"],
+                               default=None, help="Cap findings at this severity level")
+    strix_parser.add_argument("--report-format", type=str, choices=["standard", "h1", "bugcrowd", "custom"],
+                               default="standard", help="Report format for bug bounty submissions")
+    strix_parser.add_argument("--safe-harbor", action="store_true",
+                               help="Enable safe harbor mode (no active exploitation, detection only)")
+    strix_parser.add_argument("--engagement-rules", type=str, default=None,
+                               help="Path to YAML file with engagement rules / RoE")
+    strix_parser.add_argument("--asset-type", type=str,
+                               choices=["domain", "url", "api", "cidr", "ip", "ios", "android", "source", "exec", "hw"],
+                               default=None, help="Type of target asset (bug bounty scope)")
 
     # ====================================================================
     # Legacy subcommands
@@ -263,6 +286,17 @@ def build_parser() -> argparse.ArgumentParser:
     web_parser.add_argument("--mode", type=str, choices=["osint", "bugbounty", "ctf", "pentest", "api-pentest"],
                             default="pentest", help="Scan mode")
     web_parser.add_argument("--parallel", action="store_true", help="Run agents in parallel")
+
+    # ====================================================================
+    # Tools management — install/check security testing tools
+    # ====================================================================
+    tools_parser = subparsers.add_parser("tools", help="Manage security testing tools")
+    tools_sub = tools_parser.add_subparsers(dest="tools_command")
+    tools_install = tools_sub.add_parser("install", help="Auto-detect OS and install missing tools")
+    tools_install.add_argument("--tool", type=str, default=None, help="Install specific tool only (nmap, nuclei, naabu, httpx, sqlmap, jq, nikto, gobuster)")
+    tools_install.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompts")
+    tools_list = tools_sub.add_parser("list", help="Show installed tool status")
+    tools_check = tools_sub.add_parser("check", help="Check which tools are available")
 
     return parser
 
@@ -1182,6 +1216,10 @@ def main(argv: list[str] | None = None):
     # ====================================================================
     # Web Dashboard: argus web --port 8484 -t target.com --mode pentest
     # ====================================================================
+    if args.command == "tools":
+        from argus.toolkit.tools_manager import handle_tools_cli
+        return handle_tools_cli(args)
+
     if args.command == "web":
         host = getattr(args, 'host', '0.0.0.0')
         port = getattr(args, 'port', 8484)

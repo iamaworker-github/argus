@@ -167,6 +167,16 @@ class Config:
     scan_depth_standard_tokens: int = 1500
     scan_depth_deep_tokens: int = 3000
 
+    # Local model / GPU support
+    local_model_enabled: bool = False
+    local_model_provider: str = "ollama"  # ollama, llamacpp, vllm
+    local_model_name: str = "llama3:8b"
+    local_model_api_base: str = "http://localhost:11434/v1"
+    gpu_enabled: bool = False
+    gpu_backend: str = "cuda"  # cuda, rocm, cpu
+    gpu_device_ids: str = "0"
+    gpu_memory_limit: int = 8  # GB
+
     # Internal cache for runtime overrides (set via ``set_config``)
     _runtime_overrides: ClassVar[Dict[str, Any]] = {}
 
@@ -251,6 +261,14 @@ class Config:
             "scan_depth_quick_tokens",
             "scan_depth_standard_tokens",
             "scan_depth_deep_tokens",
+            "local_model_enabled",
+            "local_model_provider",
+            "local_model_name",
+            "local_model_api_base",
+            "gpu_enabled",
+            "gpu_backend",
+            "gpu_device_ids",
+            "gpu_memory_limit",
         ]
 
     @classmethod
