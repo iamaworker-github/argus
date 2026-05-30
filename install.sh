@@ -455,9 +455,11 @@ show_usage() {
     echo; echo -e "${BOLD}Usage:${NC}"
     echo "  curl -fsSL ${RAW_URL}/install.sh | bash"
     echo "  curl -fsSL ... | bash -s -- --prefix /opt/argus"
+    echo "  curl -fsSL ... | bash -s -- --docker"
     echo "  curl -fsSL ... | bash -s -- --uninstall"
     echo; echo -e "${BOLD}Options:${NC}"
     echo "  --prefix DIR    Install to DIR (default: ${INSTALL_DIR})"
+    echo "  --docker        Install via Docker (port 8484)"
     echo "  --uninstall     Remove Argus"
     echo "  --help, -h      Show this help"
     echo; echo -e "${BOLD}Env vars:${NC}  REPO_OWNER  REPO_NAME  INSTALL_DIR  BRANCH"; echo; exit 0
@@ -468,13 +470,54 @@ show_summary() {
     echo -e "${GREEN}║     Argus installed successfully!                ║${NC}"
     echo -e "${GREEN}║     See Everything. Miss Nothing.                ║${NC}"
     echo -e "${GREEN}╚════════════════════════════════════════════════╝${NC}"; echo
-    echo -e "${BOLD}Quick start:${NC}"
+    echo -e "${BOLD}Quick start (local):${NC}"
     echo -e "  1. Edit ${ENV_FILE} and add your LLM_API_KEY"
     echo -e "  2. Run: source $(shell_config)"
-    echo -e "  3. Run: argus strix --target https://example.com -m quick"
-    echo; echo -e "${BOLD}Commands:${NC}  argus strix | argus repl | argus web | argus --help"
-    echo -e "${BOLD}Go tools:${NC}  pd-httpx  naabu  nuclei  katana  gau  waybackurls"
+    echo -e "  3a. Full scan: argus strix --target https://example.com -m deep"
+    echo -e "  3b. Swarm mode: argus swarm --target example.com --playbook bug-bounty"
+    echo -e "  3c. MCP server: argus mcp serve"
+    echo; echo -e "${BOLD}Quick start (Docker):${NC}"
+    echo -e "  docker run -d --name argus -p 8484:8484 -e OPENAI_API_KEY=sk-... iamaworker135/argus:latest-ai"
+    echo; echo -e "${BOLD}Commands:${NC}  argus strix | argus swarm | argus mcp | argus playbook"
+    echo -e "${BOLD}Swarm playbooks:${NC}  bug-bounty  external-asm  ci-cd  ctf-solver"
     echo -e "${CYAN}Docs: https://github.com/${REPO_OWNER}/${REPO_NAME}${NC}"; echo
+}
+
+# =============================================================================
+# Docker install
+# =============================================================================
+docker_install() {
+    show_banner
+    echo; echo -e "${CYAN}Installing Argus via Docker...${NC}"; echo
+
+    if ! check_cmd docker; then
+        log_error "Docker not found. Install Docker first: https://docs.docker.com/engine/install/"
+        exit 1
+    fi
+
+    log_info "Pulling Argus Docker image..."
+    docker pull iamaworker135/argus:latest-ai
+
+    log_info "Starting Argus container on port 8484..."
+    docker run -d --name argus -p 8484:8484 \
+        -e OPENAI_API_KEY="${OPENAI_API_KEY:-}" \
+        -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" \
+        iamaworker135/argus:latest-ai
+
+    sleep 2
+    if docker ps --filter "name=argus" --format "{{.Status}}" | grep -q "Up"; then
+        log_ok "Argus is running at http://localhost:8484"
+        echo; echo -e "${BOLD}Commands:${NC}"
+        echo "  docker logs -f argus    # View logs"
+        echo "  docker stop argus       # Stop Argus"
+        echo "  docker start argus      # Start Argus"
+        echo "  docker rm -f argus      # Remove container"
+        echo; echo -e "${YELLOW}Set API keys in Docker env or .env file${NC}"
+    else
+        log_error "Container failed to start. Check: docker logs argus"
+        exit 1
+    fi
+    exit 0
 }
 
 # =============================================================================
@@ -484,6 +527,7 @@ main() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --uninstall) uninstall ;;
+            --docker) docker_install ;;
             --prefix) shift; INSTALL_DIR="$1"; BIN_DIR="${INSTALL_DIR}/bin"; VENV_DIR="${INSTALL_DIR}/venv"; REPO_DIR="${INSTALL_DIR}/repo"; ENV_FILE="${INSTALL_DIR}/.env" ;;
             --help|-h) show_usage ;;
             *) echo -e "${RED}Unknown option: $1${NC}"; show_usage ;;
