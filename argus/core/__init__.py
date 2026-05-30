@@ -772,4 +772,16 @@ __all__ = [
     "CorpusPopulator", "populate_from_all_sources", "get_corpus_stats", "refresh_corpus",
     "EmbeddingEngine", "get_embedding_engine", "EMBEDDING_DIM",
     "ReactionEngine", "ReactionRule", "get_reaction_engine",
+    # AI Enhancement Modules
+    "SelfReflectionEngine", "SessionReflection", "get_self_reflection",
+    "PromptEvolutionEngine", "get_prompt_evolution",
+    "VulnChainingAI", "AttackChain", "get_vuln_chaining",
+    "DebateEngine", "DebateResult", "get_debate_engine",
+    "SelfHealingEngine", "HealingResult", "get_self_healing",
+    "ToolGenerator", "GeneratedTool", "get_tool_generator",
+    "ReinforcementLearningEngine", "get_rl_engine",
+    "TargetProfiler", "TargetProfile", "get_target_profiler",
+    "FailoverEngine", "get_failover_engine",
+    "ReActEngineV2", "get_react_v2",
+    "AIOrchestrator", "get_ai_orchestrator",
 ]

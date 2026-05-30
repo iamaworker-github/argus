@@ -74,6 +74,40 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     # ====================================================================
+    # Swarm mode: argus swarm --target <target>
+    # ====================================================================
+    swarm_parser = subparsers.add_parser("swarm", help="Swarm mode — stigmergic blackboard agents")
+    swarm_parser.add_argument("--target", "-t", type=str, required=True,
+                              help="Target to scan (URL, domain, IP)")
+    swarm_parser.add_argument("--playbook", "-p", type=str, default="bug-bounty",
+                              choices=["bug-bounty", "external-asm", "ci-cd", "ctf-solver"],
+                              help="Playbook to use for the scan")
+    swarm_parser.add_argument("--bias", type=str, default="med",
+                              choices=["low", "med", "high"],
+                              help="Exploration bias: conservative, balanced, aggressive")
+    swarm_parser.add_argument("--max-decisions", type=int, default=20,
+                              help="Maximum swarm iterations")
+    swarm_parser.add_argument("--budget", type=int, default=30,
+                              help="Budget in minutes")
+
+    # ====================================================================
+    # MCP server: argus mcp serve
+    # ====================================================================
+    mcp_parser = subparsers.add_parser("mcp", help="MCP server for Claude Desktop / Cursor")
+    mcp_sub = mcp_parser.add_subparsers(dest="mcp_command")
+    mcp_serve = mcp_sub.add_parser("serve", help="Start MCP server over stdio")
+
+    # ====================================================================
+    # Playbook commands: argus playbook
+    # ====================================================================
+    pb_parser = subparsers.add_parser("playbook", help="List/run playbooks")
+    pb_sub = pb_parser.add_subparsers(dest="pb_command")
+    pb_list = pb_sub.add_parser("list", help="List available playbooks")
+    pb_run = pb_sub.add_parser("run", help="Run a playbook")
+    pb_run.add_argument("name", type=str, help="Playbook name (bug-bounty, external-asm, ci-cd, ctf-solver)")
+    pb_run.add_argument("--target", "-t", type=str, required=True, help="Target to scan")
+
+    # ====================================================================
     # Strix-compatible top-level flags (argus --target <target>)
     # ====================================================================
     strix_parser = subparsers.add_parser("strix", help="Strix-compatible scanning interface")
@@ -1256,7 +1290,67 @@ def main(argv: list[str] | None = None):
         ws.run_server(host=host, port=port)
         return
 
-    parser.error("Unknown command")
+    # ====================================================================
+    # Swarm mode: argus swarm --target <target>
+    # ====================================================================
+    if args.command == "swarm":
+        from argus.core.swarm import get_blackboard, get_scheduler, SwarmAgent, BlackboardEntry
+        from argus.core.swarm.scheduler import SwarmContext
+        from argus.core.playbook_engine import get_playbook_engine
+        from argus.core.swarm.pheromone import PheromoneConfig
+
+        click.secho("🐝 Argus Swarm Mode — stigmergic blackboard coordination", fg="yellow", bold=True)
+        click.echo(f"  Target: {args.target}")
+        click.echo(f"  Playbook: {args.playbook}")
+        click.echo(f"  Bias: {args.bias}")
+        click.echo(f"  Budget: {args.budget}min")
+
+        board = get_blackboard()
+        scheduler = get_scheduler()
+        pheromone_cfg = PheromoneConfig.from_bias(args.bias)
+
+        # Run playbook
+        engine = get_playbook_engine()
+        result = asyncio.run(engine.run(
+            name=args.playbook,
+            target=args.target,
+        ))
+        click.echo(json.dumps(result, indent=2))
+        return
+
+    # ====================================================================
+    # MCP server: argus mcp serve
+    # ====================================================================
+    if args.command == "mcp":
+        if args.mcp_command == "serve":
+            from argus.core.mcp_server import get_mcp_server
+            click.secho("🧩 Argus MCP Server — connect via Claude Desktop / Cursor", fg="cyan", bold=True)
+            click.echo("Listening on stdio...")
+            mcp = get_mcp_server()
+            asyncio.run(mcp.run_stdio())
+        return
+
+    # ====================================================================
+    # Playbook commands: argus playbook list|run
+    # ====================================================================
+    if args.command == "playbook":
+        from argus.core.playbook_engine import get_playbook_engine
+        engine = get_playbook_engine()
+
+        if args.pb_command == "list":
+            click.secho("📋 Available Playbooks:", fg="cyan", bold=True)
+            for pb in engine.list_playbooks():
+                click.echo(f"  • {pb['name']}: {pb['description']} ({pb['steps']} steps)")
+            return
+
+        if args.pb_command == "run":
+            click.secho(f"🐝 Running playbook: {args.name} → {args.target}", fg="yellow", bold=True)
+            result = asyncio.run(engine.run(name=args.name, target=args.target))
+            click.echo(json.dumps(result, indent=2))
+            return
+
+        click.echo("Usage: argus playbook list|run")
+        return
 
 
 if __name__ == "__main__":
