@@ -10,12 +10,14 @@
 ```
 
 > **See Everything. Miss Nothing.**
-> Argus is an AI-powered autonomous security testing platform with **50+ specialized agents**, **swarm intelligence architecture**, **14 AI brain modules**, and self-learning capabilities. It plans, executes, learns, and **thinks like a real penetration tester** — no manual configuration needed.
+> Argus is an AI-powered autonomous security testing platform with **60+ specialized agents**, **150+ hacking skills**, **swarm intelligence architecture**, **14 AI brain modules**, and self-learning capabilities. It plans, executes, learns, and **thinks like a real penetration tester** — no manual configuration needed.
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
-[![Docker](https://img.shields.io/badge/Docker-Pull-2496ED.svg?logo=docker)](https://hub.docker.com/r/iamaworker135/argus)
+[![Docker](https://img.shields.io/badge/Docker-Pull-2496ED.svg?logo=docker)](https://hub.docker.com/r/iamaworker-github/argus)
 [![GitHub](https://img.shields.io/badge/GitHub-Repo-181717.svg?logo=github)](https://github.com/iamaworker-github/argus)
+[![Agents](https://img.shields.io/badge/Agents-60%2B-8957e5)](https://github.com/iamaworker-github/argus)
+[![Skills](https://img.shields.io/badge/Skills-150%2B-1f6feb)](https://github.com/iamaworker-github/argus)
 
 ---
 
@@ -28,10 +30,15 @@ curl -fsSL https://raw.githubusercontent.com/iamaworker-github/argus/main/instal
 
 ### Docker
 ```bash
+# Main Argus platform
 docker run -d --name argus -p 8484:8484 \
   -e OPENAI_API_KEY="sk-..." \
   -e ANTHROPIC_API_KEY="sk-ant-..." \
-  iamaworker135/argus:latest-ai
+  iamaworker-github/argus:latest
+
+# CTF solver sandbox (isolated challenge environment)
+docker run -d --name argus-ctf-sandbox \
+  iamaworker-github/argus-ctf-sandbox:latest
 ```
 
 ---
@@ -40,7 +47,7 @@ docker run -d --name argus -p 8484:8484 \
 
 Argus has **two parallel execution modes** that can be used independently or together:
 
-### 1. 🐝 Swarm Mode (NEW — Stigmergic Blackboard)
+### 1. 🐝 Swarm Mode (Stigmergic Blackboard)
 ```
 TARGET_REGISTERED ──► recon agent wakes (pheromone: 0.8)
        │
@@ -81,7 +88,7 @@ Phase 6: Reporting ─── Cross-target intel + AI reports
 
 ## Features
 
-### 🐝 Swarm Intelligence (New)
+### 🐝 Swarm Intelligence
 | Feature | Description |
 |---------|-------------|
 | **Stigmergic Blackboard** | Shared knowledge store with pheromone weights + time decay |
@@ -108,17 +115,45 @@ Phase 6: Reporting ─── Cross-target intel + AI reports
 | **AI False Positive Verifier** | LLM cross-validates findings against request/response |
 | **AI Report Generator** | Executive + technical summaries in natural language |
 
-### 🔧 Agent Arsenal
-- **50+ Specialized Agents** — SQLi, XSS, SSRF, JWT, IDOR, LFI, RCE, XXE, SSTI, CORS, Open Redirect, NoSQLi, Host Header, Rate Limit, WAF Detection, Nuclei, Smart Brute Force, and 40+ more
-- **MCTS Attack Planning** — Monte Carlo Tree Search prioritizes attack paths
-- **Cross-Agent Reactions** — Agent A's findings trigger Agent B automatically
-- **Auto Remediation PR** — LLM generates fixes + creates GitHub PRs
+### 🔧 Agent Arsenal (60+ Agents)
+| Category | Agents |
+|----------|--------|
+| **Core Web** | SQLi, XSS, SSRF, IDOR, SSTI, XXE, CORS, Command Injection, Open Redirect, NoSQLi, Host Header, Rate Limit, LFI, Prototype Pollution |
+| **Auth & Identity** | JWT Attack, Authentication, OAuth Hunter, SAML Attack, Session Management |
+| **Cloud & Infra** | Cloud Security, Container Escape, Kubernetes, WAF Detection/Bypass, Nuclei |
+| **Bug Bounty** | VDP Discovery, Android APK Hacker, Web3 Auditor, CVE Exploiter, JS Secrets, Function-Wise Hunter, Info Disclosure Hunter, LLM Recon Chain, Race Condition Hunter |
+| **Bug Bounty Pipeline** | Pipeline Orchestrator (7-phase), Two-Eye Approach, Cache Poisoning, CRLF Injection, Exploit Chain Builder (A→B→C) |
+| **CTF Solving** | CTF Solver, Advanced CTF Solver (11 categories, 100+ techniques), Racing CTF Agent (multi-model) |
+| **OSINT** | OSINT Collector, Social Intel, Leak Intel, DNS Intel, Google Dork, Crypto OSINT |
+| **Enterprise** | IoT Security, Mobile Pentest, API Pentest, LLM Red Team, AI Security |
+| **Infrastructure** | Recon Agent, Smart Brute Force, Port Scanner, Medusa, PoC Validator, Remediation |
 
-### 🌐 MCP Server (New)
-Connect Claude Desktop, Cursor, or any MCP-compatible tool directly to Argus:
+### 🎯 Skills Library (150+ Skills)
+- **Vaidik Pandya Methodologies**: VDP hunter, Android APK, Web3 smart contract, JS secrets, function-wise hunting, CVE exploitation, info disclosure, LLM recon automation, race conditions, subfinder mastery
+- **2026 Bug Bounty Pipeline**: Full 7-phase pipeline, Two-Eye Approach, cache poisoning, CRLF injection
+- **Hunting Skills**: RCE (1,135 lines), IDOR (969 lines), XSS (968 lines), OAuth (770 lines), LLM/AI (930 lines)
+- **CTF Skills**: 11 categories (pwn, rev, crypto, forensics, web, osint, stego, ai_ml, malware, blockchain, misc)
+- **Pentesting**: Account takeover, SSRF, SQLi, XSS, JWT, CSRF, XXE, deserialization, file upload, business logic, GraphQL, race conditions, web3, mobile, cloud, AD, IoT
+- **Methodology**: Recon methodology, hunting methodology, report writing, SAST methodology, triage validation, vulnerability classes
+
+### 🌐 MCP Server
+Connect Claude Desktop, Cursor, VS Code Copilot, or any MCP-compatible tool directly to Argus:
 ```bash
 argus mcp serve
 ```
+
+**MCP Tools available:**
+| Tool | Description |
+|------|-------------|
+| `run_scan` | Start scan on target |
+| `get_status` | Check scan progress |
+| `bounty_search_programs` | Search HackerOne/Bugcrowd programs |
+| `bounty_submit_report` | Draft/submit bug bounty reports |
+| **`writeup_search`** | Semantic search over prior art writeups (28 vuln classes) |
+| **`writeup_techniques`** | Get exploitation techniques by vuln class |
+| **`writeup_payloads`** | Get payload samples by vuln class |
+| `health_check` | System health and diagnostics |
+
 Then in Claude Desktop config:
 ```json
 {
@@ -142,8 +177,11 @@ Real-time scan monitoring with live WebSocket updates, swarm visualization, agen
 # Traditional pentest
 argus strix --target https://example.com -m deep
 
-# Swarm mode (NEW)
+# Swarm mode
 argus swarm --target example.com --playbook bug-bounty --bias high
+
+# Bug bounty full pipeline (7-phase)
+argus pipeline --target https://example.com
 
 # List playbooks
 argus playbook list
@@ -189,16 +227,23 @@ argus web --host 0.0.0.0 --port 8484
 | `GROQ_API_KEY` | Optional | Groq (fast inference) |
 | `DEEPSEEK_API_KEY` | Optional | DeepSeek models |
 | `GITHUB_TOKEN` | Optional | For auto PR creation |
+| `CTF_SANDBOX_IMAGE` | Optional | CTF sandbox Docker image name |
+| `CTF_SANDBOX_TIMEOUT` | Optional | CTF solver timeout (default: 1800s) |
 
 Argus uses **LiteLLM** — any provider supported by LiteLLM works automatically.
 
 ---
 
-## Docker Image
+## Docker Images
 
-**Pull:** `docker pull iamaworker135/argus:latest-ai`
+| Image | Pull Command | Description |
+|-------|-------------|-------------|
+| **Argus Platform** | `docker pull iamaworker-github/argus:latest` | Full platform: 60+ agents, web dashboard, MCP, all tools |
+| **CTF Sandbox** | `docker pull iamaworker-github/argus-ctf-sandbox:latest` | Isolated CTF solver env: pwntools, radare2, volatility3, angr, z3 |
 
-Includes: Python 3.11, 50+ agents, 14 AI modules, swarm architecture, MCP server, web dashboard, nmap, pd-httpx, nuclei, naabu, katana, gau, waybackurls, and all dependencies.
+**Argus Platform** includes: Python 3.11, 60+ agents, 150+ skills, 14 AI modules, swarm architecture, MCP server, web dashboard, nmap, pd-httpx, nuclei, naabu, katana, gau, waybackurls.
+
+**CTF Sandbox** includes: pwntools, radare2, GDB, volatility3, foremost, steghide, zsteg, binwalk, ROPgadget, angr, z3-solver, pycryptodome, capstone, unicorn.
 
 ---
 
