@@ -1,6 +1,6 @@
 ---
 name: recon
-description: OSINT, subdomain enumeration, port scanning, technology fingerprinting
+description: OSINT, subdomain enumeration, port scanning, technology fingerprinting, subfinder mastery, deep recon
 category: tooling
 ---
 
@@ -32,6 +32,72 @@ Reconnaissance is the first phase of any security assessment, mapping the target
    - Parse JS files for API endpoints
    - Look for hidden directories
    - Archive analysis (Wayback Machine)
+
+## Subfinder Mastery (Deep Subdomain Enumeration)
+
+### Basic Usage
+```bash
+# Single domain
+subfinder -d target.com -silent
+
+# Multi-domain from file
+subfinder -dL domains.txt -all -silent -o subdomains.txt
+
+# Recursive (subdomain → subdomain)
+subfinder -d target.com -recursive -silent
+```
+
+### Advanced Flags
+```bash
+# Use all sources (max coverage)
+subfinder -d target.com -all -recursive -silent
+
+# Rate limiting for stealth
+subfinder -d target.com -t 50 -timeout 30 -silent
+
+# Output to file
+subfinder -d target.com -all -recursive -silent -o subdomains.txt
+
+# JSON output for automation
+subfinder -d target.com -all -recursive -silent -oJ -o subdomains.json
+```
+
+### Integration with Other Tools
+```bash
+# Full recon chain
+subfinder -d target.com -all -recursive -silent | \
+  httpx -silent -sc -cl -title -td -o live_hosts.txt
+
+# Filter only live hosts with specific status codes
+cat subdomains.txt | httpx -silent -sc -mc 200,403,301 -o filtered.txt
+
+# Screenshot all live hosts
+cat live_hosts.txt | httpx -silent -screenshot -screenshot-output screenshots/
+
+# Passive + Active combo
+subfinder -d target.com -silent | dnsx -silent -a -resp -o resolved.txt
+```
+
+### Source-Specific Enumeration
+```bash
+# Only passive sources (never touch target)
+subfinder -d target.com -silent -only-passive -recursive
+
+# Only certificate transparency
+subfinder -d target.com -silent -s ct
+
+# Chaos dataset (if API key configured)
+subfinder -d target.com -silent -s chaos
+```
+
+### Permutation Attack
+```bash
+# Generate permutations of known subdomains
+cat subdomains.txt | alterx -silent -o permutations.txt
+
+# Validate permutations
+cat permutations.txt | dnsx -silent -a -resp -o resolved_perms.txt
+```
 
 ## Internal Recon
 - Network segmentation testing
