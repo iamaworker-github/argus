@@ -29,6 +29,7 @@ DEFAULT_TIMEOUT = 180
 TOOLS_JSON = Path(__file__).resolve().parent.parent / "data" / "tools.json"
 
 DOCKER_IMAGE_OVERRIDES: Dict[str, str] = {
+    "osint_google_dork.GDorkEngine": "iamaworker135/gdork-engine",
     "information_gathering.NMAP": "instrumentisto/nmap",
     "information_gathering.Subfinder": "projectdiscovery/subfinder",
     "information_gathering.Httpx": "projectdiscovery/httpx",

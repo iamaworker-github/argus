@@ -1,4 +1,4 @@
-export type AgentStatus = 'Done' | 'Running' | 'Idle' | 'Paused' | 'Killed';
+export type AgentStatus = 'Done' | 'Running' | 'Idle' | 'Paused' | 'Killed' | 'Cancelled';
 export type Severity = 'INFO' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type NodeType = 'Host' | 'Service' | 'Application' | 'DataStore' | 'External';
 export type NodeState = 'discovered' | 'pending' | 'compromised' | 'safe';
@@ -46,6 +46,7 @@ export interface PipelineStage {
   completed: number;
   total: number;
   active?: boolean;
+  cancelled?: boolean;
 }
 
 export interface Toast {

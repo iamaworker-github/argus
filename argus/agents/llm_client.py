@@ -108,6 +108,8 @@ RATES = {
     "mistral/mistral-large": {"in": 2.00, "out": 6.00},
     "ollama/llama3": {"in": 0.0, "out": 0.0},
     "opencode/deepseek-v4-flash": {"in": 0.50, "out": 2.00},
+    "opencode/deepseek-v4-flash-free": {"in": 0.0, "out": 0.0},
+    "opencode/mimo-v2.5-free": {"in": 0.0, "out": 0.0},
     "deepseek/deepseek-v4-flash": {"in": 0.50, "out": 2.00},
     "deepseek-chat": {"in": 0.50, "out": 2.00},
     "blockrun/nvidia/deepseek-v4-flash": {"in": 0.0, "out": 0.0},
@@ -217,11 +219,16 @@ class LLMClient:
             logger.info("OpenCode API key detected — DeepSeek v4 Flash available")
 
     def _init_legacy_clients(self):
-        api_key = self.config.get("openai_api_key")
-        if api_key:
+        openai_key = self.config.get("openai_api_key") or self.config.get("opencode_api_key")
+        if openai_key:
             try:
                 from openai import AsyncOpenAI
-                self._legacy_openai = AsyncOpenAI(api_key=api_key)
+                base_url = self.config.get("opencode_api_base") or "https://opencode.ai/zen/v1"
+                is_opencode = bool(self.config.get("opencode_api_key"))
+                self._legacy_openai = AsyncOpenAI(
+                    api_key=openai_key,
+                    base_url=base_url if is_opencode else None,
+                )
             except ImportError:
                 pass
         api_key = self.config.get("anthropic_api_key")
@@ -398,8 +405,10 @@ class LLMClient:
 
             get_cost_tracker().record(provider, model, tokens_in, tokens_out, latency)
 
+            msg = choice.message
+            reply = msg.content or getattr(msg, "reasoning_content", "") or ""
             return LLMResponse(
-                content=choice.message.content or "",
+                content=reply,
                 model=getattr(response, "model", model),
                 tokens_used=total_tokens,
                 finish_reason=getattr(choice, "finish_reason", "") or "",
@@ -439,16 +448,19 @@ class LLMClient:
             if system:
                 messages.append({"role": "system", "content": system})
             messages.append({"role": "user", "content": prompt})
+            api_model = model.split("/", 1)[-1] if "/" in model else model
             response = await self._legacy_openai.chat.completions.create(
-                model=model, messages=messages, max_tokens=max_tokens, temperature=temperature,
+                model=api_model, messages=messages, max_tokens=max_tokens, temperature=temperature,
             )
             latency = (time.time() - start) * 1000
             usage = getattr(response, "usage", None)
             tokens_in = getattr(usage, "prompt_tokens", 0) if usage else 0
             tokens_out = getattr(usage, "completion_tokens", 0) if usage else 0
             get_cost_tracker().record("openai", model, tokens_in, tokens_out, latency)
+            msg = response.choices[0].message
+            reply = msg.content or getattr(msg, "reasoning_content", "") or ""
             return LLMResponse(
-                content=response.choices[0].message.content,
+                content=reply,
                 model=getattr(response, "model", model),
                 tokens_used=tokens_in + tokens_out,
                 finish_reason=getattr(response.choices[0], "finish_reason", ""),

@@ -122,7 +122,7 @@ const CAT_COLORS: Record<string, string> = {
 export default function CtfDashboard({ onClose }: Props) {
   const [flags, setFlags] = useState<Flag[]>([...FLAGS_INIT]);
   const [findings, setFindings] = useState<Finding[]>([...FINDINGS_INIT]);
-  const [cmdHistory, setCmdHistory] = useState<string[]>([]);
+  const cmdHistoryRef = useRef<string[]>([]);
   const [cmdInput, setCmdInput] = useState('');
   const [catFilter, setCatFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -598,7 +598,7 @@ export default function CtfDashboard({ onClose }: Props) {
           onChange={e => setCmdInput(e.target.value)}
           onKeyDown={e => {
             if (e.key === 'Enter' && cmdInput.trim()) {
-              setCmdHistory(h => [...h, cmdInput.trim()]);
+              cmdHistoryRef.current = [...cmdHistoryRef.current, cmdInput.trim()];
               processCmd(cmdInput.trim());
               setCmdInput('');
             }

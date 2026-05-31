@@ -148,12 +148,12 @@ export function useBackend() {
   const nodeRef = useRef<GraphNode[]>([]);
   const edgeRef = useRef<GraphEdge[]>([]);
 
-  const requestScan = useCallback(async (target: string, mode = 'pentest') => {
+  const requestScan = useCallback(async (target: string, mode = 'pentest', depth = 'standard', incremental = false) => {
     try {
       const res = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target, mode }),
+        body: JSON.stringify({ target, mode, depth, incremental }),
       });
       return await res.json();
     } catch { return null; }
@@ -163,6 +163,17 @@ export function useBackend() {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type, payload }));
     }
+  }, []);
+
+  const sendChat = useCallback(async (message: string) => {
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message }),
+      });
+      return await res.json();
+    } catch { return null; }
   }, []);
 
   useEffect(() => {
@@ -312,5 +323,5 @@ export function useBackend() {
     };
   }, []);
 
-  return { ...state, requestScan, sendCommand };
+  return { ...state, requestScan, sendCommand, sendChat };
 }

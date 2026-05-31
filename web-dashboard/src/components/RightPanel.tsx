@@ -92,6 +92,28 @@ export default function RightPanel({
         <AttackGraph nodes={nodes} edges={edges} />
       </div>
 
+      {/* Findings Filter/Search */}
+      <div className="border-b border-zinc-800 shrink-0">
+        <div className="px-3 py-1.5">
+          <div className="flex items-center gap-1 mb-1">
+            <span className="text-zinc-500 text-[13px] uppercase tracking-widest">Findings</span>
+            <span className="text-zinc-600 text-[11px]">({findings.length})</span>
+          </div>
+          <input
+            id="findings-search"
+            type="text"
+            placeholder="Search findings..."
+            onChange={(e) => {
+              const q = e.target.value.toLowerCase();
+              document.querySelectorAll<HTMLElement>('.finding-row').forEach(el => {
+                el.style.display = el.textContent?.toLowerCase().includes(q) ? '' : 'none';
+              });
+            }}
+            className="w-full bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-[11px] text-zinc-300 placeholder-zinc-600 outline-none"
+          />
+        </div>
+      </div>
+
       {/* Key Findings + Export */}
       <div className="min-h-0 border-b border-zinc-800 overflow-hidden flex flex-col" style={{ maxHeight: '160px' }}>
         <KeyFindings findings={findings} onExport={onExport} />

@@ -37,6 +37,7 @@ def _append_log(logs: list, entry: dict) -> list:
 
 # Current orchestrator reference for pause/kill
 _current_orchestrator: Optional['AgentOrchestrator'] = None
+_current_scan_task: Optional[asyncio.Task] = None
 
 DASHBOARD_DIR = Path(__file__).resolve().parent.parent / "web-dashboard" / "dist"
 
@@ -44,6 +45,39 @@ DASHBOARD_DIR = Path(__file__).resolve().parent.parent / "web-dashboard" / "dist
 class ScanRequest(BaseModel):
     target: str
     mode: str = "pentest"
+    depth: str = "standard"
+    incremental: bool = False
+    dry_run: bool = False
+    scope: Optional[List[str]] = None
+    exclude: Optional[List[str]] = None
+
+
+class ScopeConfig(BaseModel):
+    allow: List[str] = []
+    exclude: List[str] = []
+
+
+class NotificationConfig(BaseModel):
+    name: str
+    type: str  # slack, discord, webhook
+    webhook_url: str
+    min_severity: str = "medium"
+
+
+class ScheduleConfig(BaseModel):
+    target: str
+    mode: str = "pentest"
+    interval_hours: float = 24
+    depth: str = "standard"
+    incremental: bool = True
+
+
+class CICDConfig(BaseModel):
+    provider: str = "github"  # github, gitlab
+    repo: str = ""
+    pr_number: int = 0
+    token: str = ""
+    event: str = "scan_completed"
 
 
 # ---- State manager ----
@@ -142,6 +176,44 @@ class DashboardState:
         except Exception as e:
             logger.debug(f"Session save error: {e}")
 
+    def reset(self):
+        self.state.update({
+            "target": "",
+            "mode": "PENTEST",
+            "agentStatus": "IDLE",
+            "activeAgentName": "",
+            "agents": [],
+            "logs": [],
+            "thinkingLines": [],
+            "activities": [],
+            "findings": [],
+            "findingsCount": 0,
+            "technologies": [],
+            "discoveries": [],
+            "nodes": [],
+            "edges": [],
+            "riskScore": 0,
+            "riskLabel": "Unknown",
+            "targetIP": "",
+            "openPorts": 0,
+            "subdomains": 0,
+            "technologies_count": 0,
+            "attackSurface": "Unknown",
+            "commandsExecuted": 0,
+            "dataCollected": "0 MB",
+            "vulnerabilities": 0,
+            "pipeline": [
+                {"name": "AI Planning", "completed": 0, "total": 1, "active": False},
+                {"name": "Reconnaissance", "completed": 0, "total": 5, "active": False},
+                {"name": "Enumeration", "completed": 0, "total": 3, "active": False},
+                {"name": "Vulnerability", "completed": 0, "total": 4, "active": False},
+                {"name": "AI Analysis", "completed": 0, "total": 2, "active": False},
+                {"name": "Exploitation", "completed": 0, "total": 2, "active": False},
+                {"name": "Reporting", "completed": 0, "total": 2, "active": False},
+            ],
+        })
+        self._start_time = time.time()
+
     def load_from_session(self, session_id: str) -> bool:
         try:
             sm = SessionManager()
@@ -201,6 +273,7 @@ def setup_event_subscriptions():
     async def on_agent_started(event):
         agents = dashboard_state.state.get("agents", [])
         now = datetime.now().strftime("%H:%M:%S")
+        _structured_log.append({"event": "agent.started", "agent": event.agent_name, "timestamp": now})
         if not any(a.get("name") == event.agent_name for a in agents):
             agents.append({
                 "name": event.agent_name,
@@ -228,6 +301,7 @@ def setup_event_subscriptions():
     async def on_agent_completed(event):
         agents = dashboard_state.state.get("agents", [])
         now = datetime.now().strftime("%H:%M:%S")
+        _structured_log.append({"event": "agent.completed", "agent": event.agent_name, "findings": event.findings_count, "timestamp": now})
         for a in agents:
             if a["name"] == event.agent_name:
                 a["status"] = "completed"
@@ -281,6 +355,7 @@ def setup_event_subscriptions():
     async def on_finding(event):
         findings = dashboard_state.state.get("findings", [])
         now = datetime.now().strftime("%H:%M:%S")
+        _structured_log.append({"event": "finding.discovered", "title": event.title, "severity": event.severity, "agent": event.agent_name, "timestamp": now})
         findings = findings[-19:] + [{
             "text": event.title,
             "title": event.title,
@@ -557,6 +632,8 @@ async def start_scan(req: ScanRequest):
     dashboard_state.update({
         "target": req.target,
         "mode": req.mode.upper(),
+        "depth": req.depth,
+        "incremental": req.incremental,
         "sessionId": session_id,
         "agentStatus": "PLANNING",
         "targetIP": target_ip,
@@ -571,15 +648,23 @@ async def start_scan(req: ScanRequest):
         "technologies": [],
         "technologies_count": 0,
     })
+    if req.dry_run:
+        return {"status": "dry_run", "message": "Dry-run mode — no scan started"}
+    if req.scope:
+        dashboard_state.state["scope_allow"] = req.scope
+    if req.exclude:
+        dashboard_state.state["scope_exclude"] = req.exclude
     await broadcast_state()
 
-    asyncio.create_task(_run_scan_task(req.target, req.mode, session_id))
+    asyncio.create_task(_run_scan_task(req.target, req.mode, session_id, depth=req.depth, incremental=req.incremental))
 
     return {"status": "started", "session_id": session_id}
 
 
-async def _run_scan_task(target: str, mode: str, session_id: str):
-    global _current_orchestrator
+async def _run_scan_task(target: str, mode: str, session_id: str, depth: str = "standard", incremental: bool = False):
+    global _current_orchestrator, _current_scan_task
+    _current_scan_task = asyncio.current_task()
+    _current_orchestrator = None
     try:
         from argus.core.config import set_config
         from argus.cli import run_scan as _run_scan
@@ -592,7 +677,7 @@ async def _run_scan_task(target: str, mode: str, session_id: str):
         result = await _run_scan(
             target=target,
             parallel=False,
-            scan_depth="quick",
+            scan_depth=depth,
             non_interactive=True,
             mode=mode,
             event_bus=get_event_bus(),
@@ -658,8 +743,8 @@ async def _run_scan_task(target: str, mode: str, session_id: str):
         dashboard_state.update({"agentStatus": "IDLE"})
         await broadcast_state()
     finally:
-        global _current_orchestrator
         _current_orchestrator = None
+        _current_scan_task = None
 
 
 @app.get("/api/scans")
@@ -675,6 +760,303 @@ async def load_scan(session_id: str):
         raise HTTPException(status_code=404, detail="Session not found")
     await broadcast_state()
     return {"status": "loaded", "session_id": session_id}
+
+
+@app.post("/api/scan/stop")
+async def stop_scan():
+    global _current_orchestrator, _current_scan_task
+    if _current_orchestrator:
+        _current_orchestrator.cancel_all()
+        _current_orchestrator = None
+    if _current_scan_task and not _current_scan_task.done():
+        _current_scan_task.cancel()
+        _current_scan_task = None
+    dashboard_state.update({
+        "agentStatus": "CANCELLED",
+        "agents": [{"id": "all", "name": "Scan", "status": "Killed", "findings": 0}],
+        "pipeline": [
+            {"name": s["name"], "completed": s["completed"], "total": s["total"], "active": False, "cancelled": True}
+            if s.get("active") else s
+            for s in dashboard_state.state.get("pipeline", [])
+        ],
+    })
+    await broadcast_state()
+    return {"status": "stopped"}
+
+
+@app.post("/api/scan/new")
+async def new_scan():
+    global _current_orchestrator, _current_scan_task
+    if _current_orchestrator:
+        _current_orchestrator.cancel_all()
+        _current_orchestrator = None
+    if _current_scan_task and not _current_scan_task.done():
+        _current_scan_task.cancel()
+        _current_scan_task = None
+    dashboard_state.reset()
+    chat_history_store.clear()
+    await broadcast_state()
+    return {"status": "new_scan_ready"}
+
+
+# ---- Scope API ----
+@app.get("/api/scope")
+async def get_scope():
+    return {
+        "allow": dashboard_state.state.get("scope_allow", []),
+        "exclude": dashboard_state.state.get("scope_exclude", []),
+    }
+
+
+@app.post("/api/scope")
+async def set_scope(cfg: ScopeConfig):
+    dashboard_state.state["scope_allow"] = cfg.allow
+    dashboard_state.state["scope_exclude"] = cfg.exclude
+    await broadcast_state()
+    return {"status": "ok"}
+
+
+# ---- Notifications API ----
+_app_notifier = None
+
+
+def _get_notifier():
+    global _app_notifier
+    if _app_notifier is None:
+        from argus.core.notifier import get_notifier
+        _app_notifier = get_notifier()
+        _app_notifier.subscribe_to_events()
+    return _app_notifier
+
+
+@app.get("/api/notifications")
+async def list_notifications():
+    return {"channels": _get_notifier().list_channels()}
+
+
+@app.post("/api/notifications")
+async def add_notification(cfg: NotificationConfig):
+    from argus.core.notifier import NotificationChannel
+    channel = NotificationChannel(
+        name=cfg.name,
+        type=cfg.type,
+        config={"webhook_url": cfg.webhook_url},
+        min_severity=cfg.min_severity,
+    )
+    _get_notifier().add_channel(channel)
+    return {"status": "added", "name": cfg.name}
+
+
+@app.delete("/api/notifications/{name}")
+async def delete_notification(name: str):
+    ok = _get_notifier().remove_channel(name)
+    return {"status": "removed" if ok else "not_found"}
+
+
+# ---- Checkpoint / Resume API ----
+@app.get("/api/checkpoint")
+async def get_checkpoint():
+    from argus.core.checkpoint_manager import get_checkpoint_manager
+    scan_id = dashboard_state.state.get("sessionId", "")
+    if not scan_id:
+        return {"status": "no_active_scan"}
+    mgr = get_checkpoint_manager(scan_id=scan_id, target="", mode="")
+    cp = mgr.resume()
+    if cp:
+        return {"status": "found", "checkpoint": cp}
+    return {"status": "no_checkpoint"}
+
+
+@app.post("/api/scan/resume")
+async def resume_scan():
+    from argus.core.checkpoint_manager import get_checkpoint_manager
+    scan_id = dashboard_state.state.get("sessionId", "")
+    target = dashboard_state.state.get("target", "")
+    mode = dashboard_state.state.get("mode", "pentest").lower()
+    if not scan_id or not target:
+        return {"status": "nothing_to_resume"}
+    mgr = get_checkpoint_manager(scan_id=scan_id, target=target, mode=mode)
+    cp = mgr.resume()
+    if not cp:
+        return {"status": "no_checkpoint"}
+    asyncio.create_task(_run_scan_task(target, mode, scan_id))
+    return {"status": "resumed", "session_id": scan_id}
+
+
+# ---- Health Check / Dry-Run ----
+@app.get("/api/health")
+async def health_check():
+    import platform, psutil
+    return {
+        "status": "ok",
+        "version": "2.0.0",
+        "uptime": f"{int(time.time() - dashboard_state._start_time)}s",
+        "python": platform.python_version(),
+        "cpu_percent": psutil.cpu_percent(interval=0),
+        "memory_percent": psutil.virtual_memory().percent,
+        "disk_free_gb": round(psutil.disk_usage("/").free / (1024**3), 1),
+        "active_scan": dashboard_state.state.get("agentStatus") not in ("IDLE", "CANCELLED"),
+        "orchestrator_active": _current_orchestrator is not None,
+    }
+
+
+@app.post("/api/scan/dry-run")
+async def dry_run_scan(req: ScanRequest):
+    """Preview scan commands without executing."""
+    commands = [
+        f"[DRY-RUN] Target: {req.target}",
+        f"[DRY-RUN] Mode: {req.mode}",
+        f"[DRY-RUN] Depth: {req.depth}",
+        f"[DRY-RUN] Tools: nmap, nuclei, httpx, subfinder, sqlmap, ffuf",
+        f"[DRY-RUN] Agents: Recon → DomainIntel → TechIntel → Nuclei → SQLi",
+        f"[DRY-RUN] Estimated time: 15-30 min",
+        f"[DRY-RUN] Estimated findings: 5-20",
+    ]
+    if req.incremental:
+        commands.append("[DRY-RUN] Mode: incremental (diff against last scan)")
+    if req.dry_run:
+        commands.append("[DRY-RUN] Dry-run: true (no commands executed)")
+    return {"status": "dry_run", "commands": commands, "target": req.target, "mode": req.mode}
+
+
+# ---- Scan Scheduling ----
+_scheduler_task: Optional[asyncio.Task] = None
+_scheduled_jobs: List[Dict[str, Any]] = []
+
+
+@app.get("/api/schedule")
+async def list_schedules():
+    return {"schedules": _scheduled_jobs}
+
+
+@app.post("/api/schedule")
+async def add_schedule(cfg: ScheduleConfig):
+    job = {
+        "id": uuid.uuid4().hex[:8],
+        "target": cfg.target,
+        "mode": cfg.mode,
+        "interval_hours": cfg.interval_hours,
+        "depth": cfg.depth,
+        "incremental": cfg.incremental,
+        "next_run": time.time() + cfg.interval_hours * 3600,
+        "last_run": None,
+        "active": True,
+    }
+    _scheduled_jobs.append(job)
+    _ensure_scheduler()
+    return {"status": "scheduled", "job": job}
+
+
+@app.delete("/api/schedule/{job_id}")
+async def delete_schedule(job_id: str):
+    global _scheduled_jobs
+    _scheduled_jobs = [j for j in _scheduled_jobs if j["id"] != job_id]
+    return {"status": "removed"}
+
+
+def _ensure_scheduler():
+    global _scheduler_task
+    if _scheduler_task is None or _scheduler_task.done():
+        _scheduler_task = asyncio.create_task(_scheduler_loop())
+
+
+async def _scheduler_loop():
+    while True:
+        now = time.time()
+        for job in _scheduled_jobs:
+            if job.get("active") and now >= job.get("next_run", now):
+                job["last_run"] = now
+                job["next_run"] = now + job["interval_hours"] * 3600
+                asyncio.create_task(_run_scan_task(job["target"], job["mode"], uuid.uuid4().hex[:8], depth=job["depth"], incremental=job["incremental"]))
+        await asyncio.sleep(30)
+
+
+# ---- CI/CD Integration ----
+@app.post("/api/cicd/comment")
+async def cicd_comment(cfg: CICDConfig):
+    if cfg.provider == "github" and cfg.token and cfg.repo and cfg.pr_number:
+        try:
+            import httpx
+            findings = dashboard_state.state.get("findings", [])
+            summary = f"## Argus Scan Report\n\n**Target:** {dashboard_state.state.get('target', 'N/A')}\n**Mode:** {dashboard_state.state.get('mode', 'N/A')}\n**Findings:** {len(findings)}\n\n"
+            for f in findings[-10:]:
+                summary += f"- **[{f.get('severity','info').upper()}]** {f.get('title', 'N/A')}\n"
+            summary += "\n---\n*Generated by Argus Security Agent*"
+            r = await httpx.AsyncClient().post(
+                f"https://api.github.com/repos/{cfg.repo}/issues/{cfg.pr_number}/comments",
+                json={"body": summary},
+                headers={"Authorization": f"Bearer {cfg.token}", "Accept": "application/vnd.github.v3+json"},
+            )
+            return {"status": "commented" if r.status_code == 201 else "failed", "code": r.status_code}
+        except Exception as e:
+            return {"status": "error", "detail": str(e)}
+    return {"status": "skipped", "detail": "missing required fields"}
+
+
+# ---- Report Generation ----
+@app.get("/api/report/json")
+async def report_json():
+    return dashboard_state.get_state()
+
+
+@app.get("/api/report/html")
+async def report_html():
+    findings = dashboard_state.state.get("findings", [])
+    target = dashboard_state.state.get("target", "N/A")
+    mode = dashboard_state.state.get("mode", "N/A")
+    session = dashboard_state.state.get("sessionId", "N/A")
+
+    rows = ""
+    for f in findings:
+        sev = f.get("severity", "info").upper()
+        color = {"CRITICAL": "dc2626", "HIGH": "ea580c", "MEDIUM": "ca8a04", "LOW": "2563eb", "INFO": "6b7280"}.get(sev, "6b7280")
+        rows += f"<tr><td style='padding:6px 10px;border-bottom:1px solid #333;color:#{color};font-weight:bold'>{sev}</td><td style='padding:6px 10px;border-bottom:1px solid #333'>{f.get('title','')}</td><td style='padding:6px 10px;border-bottom:1px solid #333'>{f.get('category','')}</td><td style='padding:6px 10px;border-bottom:1px solid #333'>{f.get('agent_name','')}</td></tr>"
+
+    html = f"""<!DOCTYPE html><html><head><meta charset='utf-8'><title>Argus Report — {target}</title>
+<style>body{{background:#09090b;color:#e4e4e7;font-family:monospace;padding:20px}}h1{{color:#facc15}}h2{{color:#a78bfa}}table{{width:100%;border-collapse:collapse}}th{{text-align:left;padding:8px 10px;border-bottom:2px solid #52525b;color:#a1a1aa}}</style></head>
+<body><h1>🔍 Argus Security Report</h1>
+<p><strong>Target:</strong> {target} | <strong>Mode:</strong> {mode} | <strong>Session:</strong> {session}</p>
+<h2>Findings ({len(findings)})</h2>
+<table><thead><tr><th>Severity</th><th>Title</th><th>Category</th><th>Agent</th></tr></thead><tbody>{rows}</tbody></table>
+<p style='color:#52525b;margin-top:30px;font-size:12px'>Generated by Argus v2.0.0</p></body></html>"""
+    from fastapi.responses import HTMLResponse as HTMLResp
+    return HTMLResp(content=html)
+
+
+# ---- Findings Diff ----
+@app.get("/api/findings/diff/{session_a}/{session_b}")
+async def findings_diff(session_a: str, session_b: str):
+    sm = SessionManager()
+    a = sm.load_session(session_a)
+    b = sm.load_session(session_b)
+    if not a or not b:
+        return {"error": "session not found"}
+    a_titles = {f.get("title", f.get("text", "")) for f in a.get("findings", [])}
+    b_titles = {f.get("title", f.get("text", "")) for f in b.get("findings", [])}
+    new_f = b_titles - a_titles
+    fixed_f = a_titles - b_titles
+    return {
+        "session_a": session_a, "session_b": session_b,
+        "new_findings": list(new_f)[:50],
+        "fixed_findings": list(fixed_f)[:50],
+        "total_new": len(new_f), "total_fixed": len(fixed_f),
+    }
+
+
+# ---- Structured Logging ----
+_structured_log: List[Dict[str, Any]] = []
+
+
+@app.post("/api/log")
+async def write_log(entry: dict):
+    entry["timestamp"] = datetime.now().isoformat()
+    _structured_log.append(entry)
+    return {"status": "logged"}
+
+
+@app.get("/api/log")
+async def read_log(limit: int = 100):
+    return {"logs": _structured_log[-limit:]}
 
 
 chat_history_store: List[Dict[str, Any]] = []
@@ -698,7 +1080,7 @@ async def post_chat(req: ChatRequest):
     try:
         from argus.agents.llm_client import LLMClient
         client = LLMClient()
-        system_prompt = "You are Argus AI, a cybersecurity assistant embedded in an autonomous pentesting dashboard. Answer concisely with security-relevant information."
+        system_prompt = "You are Argus AI, a cybersecurity assistant powered by the model 'mimo-v2.5-free' via OpenCode API. When asked about your underlying model, mention 'mimo-v2.5-free'. Default intro: 'Hi! Main Argus hoon 👋 Tumhara AI-powered cybersecurity assistant. Main reconnaissance, bug hunting, pentesting workflows, code analysis aur security research me help kar sakta hoon. Kya explore karna chahoge?' Be concise in Hinglish."
         response = await client.generate(req.message, system=system_prompt, max_tokens=500, task="chat")
         reply_text = response.content if hasattr(response, 'content') else str(response)
         if not reply_text or reply_text.strip() == req.message:

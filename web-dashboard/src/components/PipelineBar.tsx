@@ -13,6 +13,7 @@ export default function PipelineBar({ stages }: Props) {
           const pct = stage.total > 0 ? (stage.completed / stage.total) * 100 : 0;
           const isActive = stage.active ?? (stage.completed > 0 && stage.completed < stage.total);
           const isDone = stage.completed === stage.total && stage.total > 0;
+          const isCancelled = stage.cancelled === true;
           return (
             <div key={stage.name} className="flex-1 flex flex-col items-center gap-1">
               <div className="flex items-center w-full">
@@ -21,7 +22,9 @@ export default function PipelineBar({ stages }: Props) {
                 )}
                 <div
                   className={`w-2 h-2 rounded-full border flex-shrink-0 ${
-                    isDone
+                    isCancelled
+                      ? 'bg-red-500 border-red-500'
+                      : isDone
                       ? 'bg-green-400 border-green-400'
                       : isActive
                       ? 'bg-yellow-400 border-yellow-400 animate-pulse'
@@ -32,17 +35,17 @@ export default function PipelineBar({ stages }: Props) {
                   <div
                     className="h-px flex-1 transition-all duration-1000"
                     style={{
-                      background: `linear-gradient(to right, ${isDone ? '#4ade80' : isActive ? '#facc15' : '#3f3f46'} ${pct}%, #3f3f46 ${pct}%)`,
+                      background: `linear-gradient(to right, ${isCancelled ? '#ef4444' : isDone ? '#4ade80' : isActive ? '#facc15' : '#3f3f46'} ${pct}%, #3f3f46 ${pct}%)`,
                     }}
                   />
                 )}
               </div>
               <div className="text-center">
-                <div className={`font-mono text-[12px] ${isDone ? 'text-green-400' : isActive ? 'text-yellow-400' : 'text-zinc-500'}`}>
+                <div className={`font-mono text-[12px] ${isCancelled ? 'text-red-400' : isDone ? 'text-green-400' : isActive ? 'text-yellow-400' : 'text-zinc-500'}`}>
                   {stage.name}
                 </div>
-                <div className={`font-mono text-[11px] font-bold ${isDone ? 'text-green-500' : isActive ? 'text-yellow-400 animate-pulse' : 'text-zinc-600'}`}>
-                  {isDone ? 'COMPLETED' : isActive ? 'RUNNING' : 'PENDING'}
+                <div className={`font-mono text-[11px] font-bold ${isCancelled ? 'text-red-500' : isDone ? 'text-green-500' : isActive ? 'text-yellow-400 animate-pulse' : 'text-zinc-600'}`}>
+                  {isCancelled ? 'CANCELLED' : isDone ? 'COMPLETED' : isActive ? 'RUNNING' : 'PENDING'}
                 </div>
               </div>
             </div>

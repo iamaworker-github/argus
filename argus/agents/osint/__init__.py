@@ -8,6 +8,7 @@ from argus.agents.osint.social_intel import SocialIntelAgent
 from argus.agents.osint.dns_intel import DNSIntelAgent
 from argus.agents.osint.cloud_intel import CloudIntelAgent
 from argus.agents.osint.leak_intel import LeakIntelAgent
+from argus.agents.osint.google_dork_agent import GoogleDorkingAgent
 
 __all__ = [
     "OSINTBaseAgent",
@@ -20,4 +21,5 @@ __all__ = [
     "DNSIntelAgent",
     "CloudIntelAgent",
     "LeakIntelAgent",
+    "GoogleDorkingAgent",
 ]

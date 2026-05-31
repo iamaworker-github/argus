@@ -45,7 +45,8 @@
     "scoutsuite": "nccgroup/scoutsuite:latest",
     "trivy": "aquasec/trivy:latest",
     "bettercap": "bettercap/bettercap:latest",
-    "gospider": "jaeles-project/gospider:latest"
+    "gospider": "jaeles-project/gospider:latest",
+    "gdork": "iamaworker135/gdork-engine"
   },
   "tools": [
     {
@@ -929,13 +930,24 @@
       "tags": ["dns", "reverse", "ip"]
     },
     {
-      "id": "osint.WHOIS",
-      "title": "WHOIS Lookup",
+      "id": "information_gathering.Whois",
+      "title": "Whois",
       "description": "WHOIS record lookup for domain",
       "category": "osint",
       "run_commands": ["whois"],
       "capabilities": {"sudo": false, "interactive": false},
       "tags": ["whois", "domain", "registration"]
+    },
+    {
+      "id": "osint_google_dork.GDorkEngine",
+      "title": "Gdork Engine",
+      "description": "Automated Google Dorking engine for OSINT — discovers exposed data, vulnerable apps, and misconfigurations via Google search queries",
+      "category": "osint",
+      "project_url": "https://hub.docker.com/repository/docker/iamaworker135/gdork-engine",
+      "run_commands": ["python3", "/app/gdork.py"],
+      "capabilities": {"sudo": false, "interactive": false},
+      "native_command": "",
+      "tags": ["google-dork", "osint", "recon", "discovery"]
     }
   ],
   "categories": [

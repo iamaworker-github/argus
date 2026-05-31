@@ -1,4 +1,4 @@
-import type { Agent, AgentStatus } from '../types';
+import type { Agent } from '../types';
 
 interface Props {
   agents: Agent[];
@@ -18,20 +18,24 @@ interface Props {
   onKill: (id: string) => void;
 }
 
-const statusColors: Record<AgentStatus, string> = {
+const statusColors: Record<string, string> = {
   Done: 'text-cyan-400',
   Running: 'text-green-400',
   Idle: 'text-zinc-500',
   Paused: 'text-yellow-400',
   Killed: 'text-red-500',
+  Cancelled: 'text-red-500',
+  CANCELLED: 'text-red-500',
 };
 
-const statusDot: Record<AgentStatus, string> = {
+const statusDot: Record<string, string> = {
   Done: 'bg-cyan-400',
   Running: 'bg-green-400',
   Idle: 'bg-zinc-600',
   Paused: 'bg-yellow-400',
   Killed: 'bg-red-500',
+  Cancelled: 'bg-red-500',
+  CANCELLED: 'bg-red-500',
 };
 
 function Bar({ value, color }: { value: number; color: string }) {
@@ -93,7 +97,7 @@ export default function LeftPanel({ agents, cpu, mem, net, tokens, credits, elap
                   {agent.name}
                 </span>
                 <span className={`text-[12px] font-bold ${statusColors[agent.status]}`}>
-                  {agent.status === 'Done' ? '✓' : agent.status === 'Running' ? '▶' : agent.status === 'Paused' ? '⏸' : agent.status === 'Killed' ? '✕' : '○'}
+                  {agent.status === 'Done' ? '✓' : agent.status === 'Running' ? '▶' : agent.status === 'Paused' ? '⏸' : agent.status === 'Killed' || agent.status === 'Cancelled' ? '✕' : '○'}
                 </span>
               </div>
               {/* FIX: Pause/Kill controls per agent */}

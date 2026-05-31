@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface Props {
   agentName: string;
@@ -10,9 +10,21 @@ interface Props {
 
 export default function ThinkingPanel({ agentName, thought, lastThought, tokens, thinkingLines = [] }: Props) {
   const [isCollapsed, setIsCollapsed] = useState(true);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // FIX: Collapse when empty, or show last completed thought
-  const isEmpty = !thought;
+  useEffect(() => {
+    if (thinkingLines.length > 0 || (thought && thought.length > 50)) {
+      setIsCollapsed(false);
+    }
+  }, [thinkingLines, thought]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [thinkingLines, thought]);
+
+  const isEmpty = !thought && thinkingLines.length === 0;
 
   return (
     <div className={`${isCollapsed ? 'shrink-0' : 'flex-1'} flex flex-col min-h-0 border-t border-zinc-700 bg-zinc-950`}>
@@ -39,9 +51,8 @@ export default function ThinkingPanel({ agentName, thought, lastThought, tokens,
         </div>
       </div>
 
-      {/* FIX: Show all thinking lines, larger area */}
       {!isCollapsed && (
-        <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2">
+        <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-2">
           {thinkingLines.length > 0 ? (
             thinkingLines.map((line, i) => (
               <p key={i} className="text-zinc-300 font-mono text-[12px] leading-relaxed">{line}</p>
@@ -54,9 +65,6 @@ export default function ThinkingPanel({ agentName, thought, lastThought, tokens,
             </p>
           ) : (
             <p className="text-zinc-700 font-mono text-[12px] italic">—</p>
-          )}
-          {!isEmpty && (
-            <span className="text-zinc-600 font-mono text-[13px] float-right">TOKENS: {tokens}</span>
           )}
         </div>
       )}

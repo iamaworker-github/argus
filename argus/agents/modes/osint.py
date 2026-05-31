@@ -19,6 +19,7 @@ from argus.agents.osint.domain_intel import DomainIntelAgent
 from argus.agents.osint.email_intel import EmailIntelAgent
 from argus.agents.osint.tech_intel import TechIntelAgent
 from argus.agents.osint.visual_intel import VisualIntelAgent
+from argus.agents.osint.google_dork_agent import GoogleDorkingAgent
 from argus.toolkit.osint import (
     GitHubOSINT, DomainOSINT, UsernameOSINT,
     EmailOSINT, SocialMediaOSINT, PublicRecordsOSINT,
@@ -70,6 +71,9 @@ class OSINTOrchestrator(ModeOrchestrator):
             self.target, event_bus=self.event_bus, memory_manager=self.memory_manager
         ))
         self.add_agent(VisualIntelAgent(
+            self.target, event_bus=self.event_bus, memory_manager=self.memory_manager
+        ))
+        self.add_agent(GoogleDorkingAgent(
             self.target, event_bus=self.event_bus, memory_manager=self.memory_manager
         ))
         logger.info(f"[OSINT] Loaded standard agents + advanced OSINT toolkit")
