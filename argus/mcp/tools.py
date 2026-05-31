@@ -219,3 +219,53 @@ async def _is_tool_available(tool: str) -> bool:
         return proc.returncode == 0
     except Exception:
         return False
+
+
+# ========================================================================
+# Writeup Search Tools
+# ========================================================================
+
+
+async def writeup_search(query: str, technique: str = "", k: int = 5) -> dict:
+    try:
+        from argus.mcp.writeup_search import get_writeup_server
+        server = get_writeup_server()
+        return await server.search_writeups(query, technique, k)
+    except Exception as e:
+        return {"error": str(e), "results": [], "fallback": True}
+
+
+async def writeup_get(writeup_id: str) -> dict:
+    try:
+        from argus.mcp.writeup_search import get_writeup_server
+        server = get_writeup_server()
+        return await server.get_writeup(writeup_id)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def writeup_techniques(vuln_class: str) -> dict:
+    try:
+        from argus.mcp.writeup_search import get_writeup_server
+        server = get_writeup_server()
+        return await server.search_techniques(vuln_class)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def writeup_payloads(vuln_class: str) -> dict:
+    try:
+        from argus.mcp.writeup_search import get_writeup_server
+        server = get_writeup_server()
+        return await server.search_payloads(vuln_class)
+    except Exception as e:
+        return {"error": str(e)}
+
+
+async def writeup_ingest(source: str, title: str, description: str, technique: str, severity: str, content: str) -> dict:
+    try:
+        from argus.mcp.writeup_search import get_writeup_server
+        server = get_writeup_server()
+        return await server.ingest_writeup(source, title, description, technique, severity, content)
+    except Exception as e:
+        return {"error": str(e)}

@@ -32,6 +32,8 @@ def _ensure_loaded():
         from argus.agents.autonomous_agent import AutonomousSecurityAgent
         from argus.agents.strix_pentest_agent import StrixPentestAgent
         from argus.agents.poc_validator_agent import PoCValidatorAgent
+        from argus.agents.racing_ctf_agent import RacingCTFAgent
+        from argus.agents.exploit_chain_agent import ExploitChainAgent
         _classes.update({
             "BaseAgent": BaseAgent, "Finding": Finding, "AgentResult": AgentResult, "AgentStatus": AgentStatus,
             "AgentOrchestrator": AgentOrchestrator, "ScanResult": ScanResult,
@@ -45,6 +47,8 @@ def _ensure_loaded():
             "RateLimitAgent": RateLimitAgent,
             "AutonomousSecurityAgent": AutonomousSecurityAgent,
             "StrixPentestAgent": StrixPentestAgent, "PoCValidatorAgent": PoCValidatorAgent,
+            "RacingCTFAgent": RacingCTFAgent,
+            "ExploitChainAgent": ExploitChainAgent,
         })
         _loaded = True
 
@@ -75,5 +79,7 @@ __all__ = [
     "ClickjackingAgent", "NoSQLInjectionAgent", "HostHeaderInjectionAgent",
     "JWTTAttackAgent", "RateLimitAgent",
     "AutonomousSecurityAgent", "StrixPentestAgent", "PoCValidatorAgent",
+    "RacingCTFAgent",
+    "ExploitChainAgent",
     "get_default_agents",
 ]

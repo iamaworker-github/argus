@@ -7,6 +7,7 @@ from argus.mcp.tools import (
     bounty_search_programs, bounty_get_program, bounty_triage_finding,
     bounty_find_programs, bounty_submit_report,
     health_check, check_tool, diagnose, list_allowed_tools,
+    writeup_search, writeup_get, writeup_techniques, writeup_payloads, writeup_ingest,
 )
 from argus.mcp.transports import handle_stdio, handle_sse
 
@@ -90,6 +91,32 @@ class MCPApp:
                 return {"id": msg_id, "result": result}
             elif method == "list_allowed_tools":
                 result = await list_allowed_tools()
+                return {"id": msg_id, "result": result}
+            elif method == "writeup_search":
+                result = await writeup_search(
+                    query=params.get("query", ""),
+                    technique=params.get("technique", ""),
+                    k=params.get("k", 5),
+                )
+                return {"id": msg_id, "result": result}
+            elif method == "writeup_get":
+                result = await writeup_get(writeup_id=params["writeup_id"])
+                return {"id": msg_id, "result": result}
+            elif method == "writeup_techniques":
+                result = await writeup_techniques(vuln_class=params["vuln_class"])
+                return {"id": msg_id, "result": result}
+            elif method == "writeup_payloads":
+                result = await writeup_payloads(vuln_class=params["vuln_class"])
+                return {"id": msg_id, "result": result}
+            elif method == "writeup_ingest":
+                result = await writeup_ingest(
+                    source=params["source"],
+                    title=params["title"],
+                    description=params.get("description", ""),
+                    technique=params.get("technique", ""),
+                    severity=params.get("severity", "medium"),
+                    content=params.get("content", ""),
+                )
                 return {"id": msg_id, "result": result}
             elif method == "ping":
                 return {"id": msg_id, "result": "pong"}
